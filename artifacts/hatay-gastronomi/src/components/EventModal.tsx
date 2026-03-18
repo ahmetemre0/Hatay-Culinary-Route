@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameStore } from "../store/gameStore";
-import { EventCard } from "../data/cards";
+import { EventCard, RegionCard } from "../data/cards";
 import { cn } from "@/lib/utils";
 
 export function EventModal() {
@@ -9,6 +9,7 @@ export function EventModal() {
     pendingEvent,
     players,
     currentPlayerIndex,
+    marketRegions,
     resolveEvent,
     cancelEvent,
     selectedCards,
@@ -22,6 +23,7 @@ export function EventModal() {
   const card = pendingEvent as EventCard;
 
   const needsTarget = card.action === "skip_turn" || card.action === "steal_card" || card.action === "trade_two";
+  const needsMarketRegion = card.action === "multiply_points";
 
   const handleTargetSelect = (targetId: number) => {
     if (card.action === "trade_two") {
@@ -30,6 +32,10 @@ export function EventModal() {
     } else {
       resolveEvent(targetId);
     }
+  };
+
+  const handleMarketRegionSelect = (region: RegionCard) => {
+    resolveEvent(undefined, [region.id]);
   };
 
   return (
@@ -51,6 +57,40 @@ export function EventModal() {
             <h2 className="text-white text-xl font-bold">{card.effectName}</h2>
             <p className="text-white/70 text-sm mt-1">{card.description}</p>
           </div>
+
+          {needsMarketRegion && (
+            <div className="space-y-3">
+              <h3 className="text-white/60 text-xs uppercase tracking-wider text-center mb-3">
+                Puanı 2x Yapılacak Bölge Kartını Seç
+              </h3>
+              <p className="text-yellow-300 text-xs text-center mb-3">
+                Seçtiğin bölgeyi tamamladığında puanlar iki katı alınır!
+              </p>
+              <div className="flex flex-col gap-2">
+                {marketRegions.map((region) => (
+                  <motion.button
+                    key={region.id}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleMarketRegionSelect(region)}
+                    className="w-full bg-gradient-to-r from-amber-700/40 to-amber-900/40 hover:from-amber-600/60 hover:to-amber-800/60 border border-amber-500/40 hover:border-amber-400 rounded-xl px-4 py-3 flex items-center justify-between transition-all"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{region.emoji}</span>
+                      <div className="text-left">
+                        <div className="text-white font-medium text-sm">{region.name}</div>
+                        <div className="text-white/60 text-xs">{region.dish}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-yellow-300 line-through text-sm">⭐{region.points}</span>
+                      <span className="text-green-300 font-bold">→ ⭐{region.points * 2}</span>
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {needsTarget && (
             <div className="space-y-3">
@@ -113,7 +153,7 @@ export function EventModal() {
             >
               İptal
             </motion.button>
-            {!needsTarget && (
+            {!needsTarget && !needsMarketRegion && (
               <motion.button
                 whileTap={{ scale: 0.97 }}
                 onClick={() => resolveEvent()}

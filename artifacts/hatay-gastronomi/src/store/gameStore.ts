@@ -53,6 +53,7 @@ type GameState = {
   canEndTurn: boolean;
   victoryPoints: number;
   cookingAnimation: string | null;
+  doubledMarketRegionId: string | null;
 
   startGame: (numPlayers: number, names: string[]) => void;
   drawCard: () => void;
@@ -143,6 +144,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   canEndTurn: false,
   victoryPoints: 50,
   cookingAnimation: null,
+  doubledMarketRegionId: null,
 
   startGame: (numPlayers, names) => {
     const { regionDeck, materialEventDeck } = buildInitialDecks();
@@ -183,6 +185,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       winnerIndex: null,
       hasDrawnThisTurn: false,
       canEndTurn: false,
+      doubledMarketRegionId: null,
     });
   },
 
@@ -281,7 +284,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       newRegions.push(newRegDeck.shift()!);
     }
 
-    let totalPts = cur.points + region.points;
+    const isDoubled = state.doubledMarketRegionId === region.id;
+    const earnedPoints = isDoubled ? region.points * 2 : region.points;
+    let totalPts = cur.points + earnedPoints;
 
     const players = state.players.map((p, i) => {
       if (i === state.currentPlayerIndex) {
@@ -299,7 +304,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const r = addLog(
       logs,
       logIdCounter,
-      `🍽️ ${cur.name}, ${region.name} - ${region.dish} tamamladı! +${region.points} puan`,
+      `🍽️ ${cur.name}, ${region.name} - ${region.dish} tamamladı! +${earnedPoints} puan${isDoubled ? " (2x Künefe Şöleni!)" : ""}`,
       "success"
     );
     logs = r.logs;
@@ -313,6 +318,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       logs,
       logIdCounter,
       cookingAnimation: regionId,
+      doubledMarketRegionId: isDoubled ? null : state.doubledMarketRegionId,
     };
 
     if (totalPts >= state.victoryPoints) {
@@ -356,24 +362,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     if (card.action === "multiply_points") {
-      if (cur.scoredRegions.length === 0) {
+      if (state.marketRegions.length === 0) {
         let { logs, logIdCounter } = state;
-        const r = addLog(logs, logIdCounter, "Puan katlamak için önce bir bölge tamamla!", "warning");
+        const r = addLog(logs, logIdCounter, "Markette bölge kartı yok!", "warning");
         set({ logs: r.logs, logIdCounter: r.counter });
         return;
       }
-      const lastRegion = cur.scoredRegions[cur.scoredRegions.length - 1];
-      const bonus = lastRegion.points;
-      const players = state.players.map((p, i) => {
-        if (i === state.currentPlayerIndex) {
-          const newHand = p.hand.filter((c) => c.id !== cardId);
-          return { ...p, hand: newHand, points: p.points + bonus };
-        }
-        return p;
-      });
-      let { logs, logIdCounter } = state;
-      const r = addLog(logs, logIdCounter, `🧁 ${cur.name} "Künefe Şöleni" kullandı! +${bonus} bonus puan!`, "event");
-      set({ players, logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] });
+      set({ pendingEvent: card, phase: "event_pending" });
       return;
     }
 
@@ -396,16 +391,15 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     if (card.action === "block_region") {
-      const players = state.players.map((p) => ({
-        ...p,
-        blockedFromRegion: true,
-      }));
       const newHand = cur.hand.filter((c) => c.id !== cardId);
-      const updatedPlayers = players.map((p, i) =>
-        i === state.currentPlayerIndex ? { ...p, hand: newHand } : p
-      );
+      const updatedPlayers = state.players.map((p, i) => {
+        if (i === state.currentPlayerIndex) {
+          return { ...p, hand: newHand, blockedFromRegion: false };
+        }
+        return { ...p, blockedFromRegion: true };
+      });
       let { logs, logIdCounter } = state;
-      const r = addLog(logs, logIdCounter, `☀️ ${cur.name} "Sıcak Hava Dalgası" kullandı! Bu tur kimse bölge tamamlayamaz.`, "event");
+      const r = addLog(logs, logIdCounter, `☀️ ${cur.name} "Sıcak Hava Dalgası" kullandı! Diğer oyuncular bir tur bölge tamamlayamaz.`, "event");
       set({ players: updatedPlayers, logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] });
       return;
     }
@@ -486,6 +480,29 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
+    if (card.action === "multiply_points") {
+      if (!cardIds || cardIds.length === 0) return;
+      const regionId = cardIds[0];
+      const region = state.marketRegions.find((r) => r.id === regionId);
+      if (!region) return;
+      const newHand = cur.hand.filter((c) => c.id !== card.id);
+      const players = state.players.map((p, i) =>
+        i === state.currentPlayerIndex ? { ...p, hand: newHand } : p
+      );
+      let { logs, logIdCounter } = state;
+      const r = addLog(logs, logIdCounter, `🧁 ${cur.name} "Künefe Şöleni" kullandı! ${region.name} - ${region.dish} kartının puanı 2x oldu!`, "event");
+      set({
+        players,
+        phase: "playing",
+        pendingEvent: null,
+        doubledMarketRegionId: regionId,
+        logs: r.logs,
+        logIdCounter: r.counter,
+        discardPile: [...state.discardPile, card],
+      });
+      return;
+    }
+
     set({ phase: "playing", pendingEvent: null });
   },
 
@@ -500,9 +517,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     const numPlayers = state.players.length;
     let nextIdx = (state.currentPlayerIndex + 1) % numPlayers;
 
-    let players = state.players.map((p) => ({
+    let players = state.players.map((p, i) => ({
       ...p,
-      blockedFromRegion: false,
+      blockedFromRegion: i === state.currentPlayerIndex ? false : p.blockedFromRegion,
     }));
 
     let skipped = 0;
@@ -554,6 +571,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       hasDrawnThisTurn: false,
       canEndTurn: false,
       cookingAnimation: null,
+      doubledMarketRegionId: null,
     });
   },
 }));
