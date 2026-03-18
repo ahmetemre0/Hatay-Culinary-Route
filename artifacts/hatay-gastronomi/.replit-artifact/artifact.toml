@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Hatay Gastronomi Rotası"
+version = "1.0.0"
+id = "artifacts/hatay-gastronomi"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+localPort = 25740
+name = "web"
+paths = ["/"]
+
+[services.development]
+run = "pnpm --filter @workspace/hatay-gastronomi run dev"
+
+[services.env]
+PORT = "25740"
+BASE_PATH = "/"
+
+[services.production]
+build = ["pnpm", "--filter", "@workspace/hatay-gastronomi", "run", "build"]
+publicDir = "artifacts/hatay-gastronomi/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"

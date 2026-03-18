@@ -1,0 +1,69 @@
+1. Bölge (Hedef) Kartları (Toplam: 25 Kart)
+Bu kartlar masanın ortasında "Restoranlar" veya "Duraklar" olarak durur.
+
+Antakya (Tepsi Kebabı) x3: (Malzeme: Et + Sebze + Ateş) - 10 Puan
+
+İskenderun (Döner) x3: (Malzeme: Et + Ekmek + Sos) - 8 Puan
+
+Samandağ (Humus) x3: (Malzeme: Nohut + Tahin + Zeytinyağı) - 7 Puan
+
+Altınözü (Zeytin Salatası) x3: (Malzeme: Zeytin + Nar Ekşisi + Kekik) - 6 Puan
+
+Yayladağı (Lokum) x3: (Malzeme: Şeker + Meyve + Nişasta) - 5 Puan
+
+Kırıkhan (Kavun/Kavun İçi) x3: (Malzeme: Meyve + Su + Buz) - 4 Puan
+
+Arsuz (Balık Ekmeği) x3: (Malzeme: Balık + Ekmek + Sebze) - 8 Puan
+
+Dörtyol (Narenciye Tabağı) x2: (Malzeme: Meyve + Meyve) - 3 Puan
+
+Belen (Tava) x2: (Malzeme: Et + Ateş + Zeytinyağı) - 9 Puan
+
+2. Malzeme Kartları (Toplam: 55 Kart)
+Oyuncuların elinde tuttuğu kaynaklar.
+
+Et (Kıyma/Kuşbaşı) x8
+
+Sebze (Biber/Domates/Maydanoz) x7
+
+Ekmek (Lavaş/Tırnaklı) x6
+
+Zeytinyağı / Zeytin x6
+
+Ateş (Pişirme Gücü) x5
+
+Nohut / Tahin x5
+
+Nar Ekşisi / Kekik x5
+
+Şeker / Nişasta x4
+
+Meyve / Narenciye x4
+
+Sos / Baharat x3
+
+Vakıflı Sepeti (Joker) x2: (Herhangi bir malzemenin yerine geçer)
+
+3. "Ağzımızın Tadı" Olay Kartları (Toplam: 20 Kart)
+Stratejiyi ve opsiyonları değiştiren müdahale kartları.
+
+"Samandağ Biberi" (Acı Baskın) x4: Bir rakibin hamlesini durdurur (İptal kartı).
+
+"Asi Nehri Taştı" (Karıştır) x3: Herkes elindeki tüm kartları desteye koyup yeniden çeker.
+
+"Misafirperverlik" (Takas) x3: Rakibinden rastgele 1 kart çek.
+
+"Bereketli Topraklar" (Çek) x3: Desteden fazladan 2 kart çek.
+
+"Esnaf Dayanışması" (Yardım) x3: Başka bir oyuncuyla elindeki 2 kartı açıkça takas et.
+
+"Sıcak Hava Dalgası" (Yavaşla) x2: Tüm oyuncular bir sonraki tur bölge tamamlayamaz.
+
+"Künefe Şöleni" (Bonus) x2: Önündeki bir bölgenin puanını 2 ile çarp.
+
+Kurulum ve Oynanış Notu:
+Başlangıç: Herkese 5 malzeme kartı dağıtılır.
+
+Akış: Sırası gelen desteden 1 kart çeker. Elindeki malzemeler ortadaki 3 açık bölge kartından birine yetiyorsa o bölgeyi alır (pişirir) ve puan hanesine koyar.
+
+Opsiyon: Oyuncu elinde "Ağzımızın Tadı" kartı varsa onu kullanıp rakiplerini engelleyebilir veya kendi rotasını hızlandırabilir.
