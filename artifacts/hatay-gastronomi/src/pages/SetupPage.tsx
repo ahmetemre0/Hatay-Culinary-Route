@@ -2,7 +2,11 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { useGameStore } from "../store/gameStore";
 
-export function SetupPage() {
+type Props = {
+  onBack?: () => void;
+};
+
+export function SetupPage({ onBack }: Props) {
   const [numPlayers, setNumPlayers] = useState(2);
   const [names, setNames] = useState(["Oyuncu 1", "Oyuncu 2", "Oyuncu 3", "Oyuncu 4"]);
   const startGame = useGameStore((s) => s.startGame);
@@ -19,6 +23,14 @@ export function SetupPage() {
         transition={{ type: "spring", stiffness: 200, damping: 20 }}
         className="bg-black/40 backdrop-blur-md rounded-3xl p-8 max-w-md w-full border border-white/10 shadow-2xl"
       >
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="text-white/50 hover:text-white/80 text-sm transition-colors mb-4 block"
+          >
+            ← Mod Seçimine Dön
+          </button>
+        )}
         <div className="text-center mb-8">
           <motion.div
             animate={{ rotate: [0, -5, 5, 0] }}

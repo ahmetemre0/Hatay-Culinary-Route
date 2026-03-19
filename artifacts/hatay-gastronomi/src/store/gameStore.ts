@@ -373,20 +373,22 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     if (card.action === "reshuffle_all") {
-      let deck = [...state.drawDeck];
-      const allCards: Card[] = [];
+      const allCards: Card[] = [...state.drawDeck, ...state.discardPile];
       const players = state.players.map((p) => {
-        allCards.push(...p.hand);
+        allCards.push(...p.hand.filter((c) => c.id !== cardId));
         return { ...p, hand: [] };
       });
-      deck = shuffle([...deck, ...allCards]);
+      const shuffled = shuffle(allCards);
+      let idx = 0;
       const newPlayers = players.map((p) => {
-        const hand = deck.splice(0, 5);
+        const hand: Card[] = [];
+        for (let i = 0; i < 5 && idx < shuffled.length; i++) hand.push(shuffled[idx++]);
         return { ...p, hand };
       });
+      const remaining = shuffled.slice(idx);
       let { logs, logIdCounter } = state;
       const r = addLog(logs, logIdCounter, `🌊 ${cur.name} "Asi Nehri Taştı" kullandı! Herkes yeniden çekti.`, "event");
-      set({ players: newPlayers, drawDeck: deck, logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] });
+      set({ players: newPlayers, drawDeck: remaining, discardPile: [], logs: r.logs, logIdCounter: r.counter });
       return;
     }
 

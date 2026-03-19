@@ -1,12 +1,12 @@
 import { motion } from "framer-motion";
-import { useGameStore } from "../store/gameStore";
+import { useOnlineStore } from "../store/onlineStore";
 
 type Props = {
-  onBack?: () => void;
+  onBack: () => void;
 };
 
-export function GameOverPage({ onBack }: Props) {
-  const { players, winnerIndex, resetGame } = useGameStore();
+export function OnlineGameOverPage({ onBack }: Props) {
+  const { players, winnerIndex, roomCode } = useOnlineStore();
   const winner = winnerIndex !== null ? players[winnerIndex] : null;
   const sorted = [...players].sort((a, b) => b.points - a.points);
 
@@ -28,15 +28,16 @@ export function GameOverPage({ onBack }: Props) {
 
         <h1 className="text-3xl font-bold text-white mb-1">Oyun Bitti!</h1>
         {winner && (
-          <p className="text-amber-300 text-lg mb-6">
+          <p className="text-amber-300 text-lg mb-2">
             <span className="font-bold">{winner.name}</span> kazandı!
           </p>
         )}
+        <p className="text-white/30 text-xs mb-6">Oda: #{roomCode}</p>
 
         <div className="space-y-3 mb-8">
           {sorted.map((player, rank) => (
             <motion.div
-              key={player.id}
+              key={rank}
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: rank * 0.1 }}
@@ -57,37 +58,21 @@ export function GameOverPage({ onBack }: Props) {
                   </div>
                 </div>
               </div>
-              <span
-                className={`font-bold text-lg ${
-                  rank === 0 ? "text-yellow-300" : "text-white/80"
-                }`}
-              >
+              <span className={`font-bold text-lg ${rank === 0 ? "text-yellow-300" : "text-white/80"}`}>
                 ⭐ {player.points}
               </span>
             </motion.div>
           ))}
         </div>
 
-        <div className="space-y-3">
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={resetGame}
-            className="w-full bg-gradient-to-r from-amber-500 to-red-500 text-white font-bold py-4 rounded-xl text-lg"
-          >
-            🔄 Yeniden Oyna
-          </motion.button>
-          {onBack && (
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={onBack}
-              className="w-full bg-white/10 hover:bg-white/20 text-white/70 font-semibold py-3 rounded-xl transition-all"
-            >
-              🏠 Ana Menüye Dön
-            </motion.button>
-          )}
-        </div>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={onBack}
+          className="w-full bg-gradient-to-r from-amber-500 to-red-500 text-white font-bold py-4 rounded-xl text-lg"
+        >
+          🏠 Ana Menüye Dön
+        </motion.button>
       </motion.div>
     </div>
   );
