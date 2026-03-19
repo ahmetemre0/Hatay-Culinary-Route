@@ -46,6 +46,26 @@ export type PlayerView = {
   victoryPoints: number;
 };
 
+const SESSION_KEY = "hatay_game_session";
+
+function saveSession(roomCode: string, playerName: string) {
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ roomCode, playerName }));
+  } catch {}
+}
+
+function loadSession(): { roomCode: string; playerName: string } | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+
+function clearSession() {
+  try { localStorage.removeItem(SESSION_KEY); } catch {}
+}
+
 type OnlineState = {
   socket: Socket | null;
   connected: boolean;
@@ -131,11 +151,20 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     const socket = io(getSocketUrl(), {
       path: "/api/socket.io",
       transports: ["websocket", "polling"],
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
     });
 
     socket.on("connect", () => {
       set({ connected: true, errorMessage: null });
+      const session = loadSession();
+      if (session) {
+        const state = get();
+        if (state.onlinePhase !== "idle" && state.onlinePhase !== "waiting_room") {
+          socket.emit("rejoin_room", { roomCode: session.roomCode, playerName: session.playerName });
+        }
+      }
     });
 
     socket.on("disconnect", () => {
@@ -147,20 +176,31 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     });
 
     socket.on("room_joined", ({ roomCode }: { roomCode: string }) => {
+      const { playerName } = get();
+      saveSession(roomCode, playerName);
       set({ roomCode, onlinePhase: "waiting_room" });
+    });
+
+    socket.on("rejoin_ok", () => {
+      set({ errorMessage: null });
+    });
+
+    socket.on("rejoin_failed", ({ message }: { message: string }) => {
+      clearSession();
+      set({ errorMessage: message, onlinePhase: "idle" });
     });
 
     socket.on("game_state", (view: PlayerView) => {
       const state = get();
-      const isHost = view.players[0]?.name === state.players[0]?.name
-        ? state.isHost
-        : socket.id === view.hostSocketId;
+      const isHost = socket.id === view.hostSocketId;
 
       let onlinePhase: OnlinePhase = "waiting_room";
       if (view.phase === "playing") onlinePhase = "playing";
       else if (view.phase === "event_pending") onlinePhase = "event_pending";
       else if (view.phase === "game_over") onlinePhase = "game_over";
       else if (view.phase === "lobby") onlinePhase = "waiting_room";
+
+      if (onlinePhase === "game_over") clearSession();
 
       set({
         myPlayerIndex: view.myPlayerIndex,
@@ -179,10 +219,10 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
         pendingEvent: view.pendingEvent,
         cookingAnimation: view.cookingAnimation,
         victoryPoints: view.victoryPoints,
-        isHost: socket.id === view.hostSocketId,
+        isHost,
         roomCode: view.roomCode,
         onlinePhase,
-        selectedCards: [],
+        selectedCards: state.selectedCards,
       });
     });
 
@@ -204,13 +244,18 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
   createRoom: () => {
     const { socket, playerName } = get();
     if (!socket || !playerName.trim()) return;
-    socket.emit("create_room", { playerName: playerName.trim() });
+    const name = playerName.trim();
+    socket.emit("create_room", { playerName: name });
+    set({ playerName: name });
   },
 
   joinRoom: (code) => {
     const { socket, playerName } = get();
     if (!socket || !playerName.trim() || !code.trim()) return;
-    socket.emit("join_room", { roomCode: code.trim().toUpperCase(), playerName: playerName.trim() });
+    const name = playerName.trim();
+    const roomCode = code.trim().toUpperCase();
+    socket.emit("join_room", { roomCode, playerName: name });
+    set({ playerName: name });
   },
 
   startGame: () => {
@@ -221,6 +266,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
   leaveRoom: () => {
     const { socket } = get();
     socket?.emit("leave_room");
+    clearSession();
     set({
       onlinePhase: "idle",
       roomCode: "",
@@ -276,6 +322,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     const { socket } = get();
     socket?.emit("leave_room");
     socket?.disconnect();
+    clearSession();
     set({
       socket: null,
       connected: false,
@@ -303,3 +350,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     });
   },
 }));
+
+export function persistSession(roomCode: string, playerName: string) {
+  saveSession(roomCode, playerName);
+}

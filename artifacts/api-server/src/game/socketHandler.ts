@@ -1,6 +1,6 @@
 import { Server, Socket } from "socket.io";
 import {
-  createRoom, joinRoom, getRoomBySocket, removePlayer, startGame,
+  createRoom, joinRoom, rejoinRoom, getRoomBySocket, removePlayer, startGame,
   handleDrawCard, handleTryComplete, handleUseEventCard, handleResolveEvent,
   handleEndTurn, buildPlayerView, Room,
 } from "./roomManager.js";
@@ -99,6 +99,18 @@ export function setupSocketHandler(io: Server) {
       const err = handleEndTurn(room, socket.id);
       if (err) { socket.emit("error_msg", { message: err }); return; }
       emitAll(io, room);
+    });
+
+    socket.on("rejoin_room", ({ roomCode, playerName }: { roomCode: string; playerName: string }) => {
+      try {
+        const { room, error } = rejoinRoom(socket.id, roomCode, playerName);
+        if (error || !room) { socket.emit("rejoin_failed", { message: error ?? "Yeniden bağlanılamadı!" }); return; }
+        socket.join(room.code);
+        socket.emit("rejoin_ok");
+        emitAll(io, room);
+      } catch (e) {
+        socket.emit("rejoin_failed", { message: String(e) });
+      }
     });
 
     socket.on("leave_room", () => {

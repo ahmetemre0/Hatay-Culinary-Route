@@ -114,6 +114,27 @@ export function getRoom(code: string): Room | null {
   return rooms.get(code.toUpperCase()) ?? null;
 }
 
+export function rejoinRoom(newSocketId: string, code: string, playerName: string): { room: Room | null; error?: string } {
+  const room = rooms.get(code.toUpperCase());
+  if (!room) return { room: null, error: "Oda bulunamadı!" };
+  if (room.state.phase === "lobby") return { room: null, error: "Oyun henüz başlamadı!" };
+
+  const pIdx = room.state.players.findIndex(p => p.name === playerName);
+  if (pIdx === -1) return { room: null, error: "Oyuncu bulunamadı!" };
+
+  const oldSocketId = room.state.players[pIdx].socketId;
+  room.state.players[pIdx].socketId = newSocketId;
+  socketToRoom.delete(oldSocketId);
+  socketToRoom.set(newSocketId, code.toUpperCase());
+
+  if (room.hostSocketId === oldSocketId) {
+    room.hostSocketId = newSocketId;
+  }
+
+  addMessage(room.state, `${playerName} yeniden bağlandı`, "info");
+  return { room };
+}
+
 export function removePlayer(socketId: string): { room: Room | null; wasHost: boolean; playerName: string } {
   const room = getRoomBySocket(socketId);
   if (!room) return { room: null, wasHost: false, playerName: "" };

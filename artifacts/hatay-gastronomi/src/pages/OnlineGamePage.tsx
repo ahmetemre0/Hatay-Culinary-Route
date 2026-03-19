@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useOnlineStore } from "../store/onlineStore";
 import { GameCard } from "../components/GameCard";
@@ -23,7 +23,7 @@ function ActionFeed() {
   }, [messages]);
 
   return (
-    <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 w-72 pointer-events-none">
+    <div className="fixed bottom-28 right-3 z-50 flex flex-col gap-2 w-64 pointer-events-none">
       <AnimatePresence>
         {toasts.map((msg) => (
           <motion.div
@@ -479,6 +479,34 @@ function MessagePanel() {
   );
 }
 
+function playGameSound(type: "your_turn" | "turn_end") {
+  try {
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = "sine";
+
+    if (type === "your_turn") {
+      osc.frequency.setValueAtTime(523, ctx.currentTime);
+      osc.frequency.setValueAtTime(659, ctx.currentTime + 0.12);
+      osc.frequency.setValueAtTime(784, ctx.currentTime + 0.24);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.6);
+    } else {
+      osc.frequency.setValueAtTime(659, ctx.currentTime);
+      osc.frequency.setValueAtTime(523, ctx.currentTime + 0.18);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.4);
+    }
+  } catch {}
+}
+
 export function OnlineGamePage() {
   const {
     players,
@@ -497,6 +525,24 @@ export function OnlineGamePage() {
   const myPlayer = players[myPlayerIndex];
   const currentPlayer = players[currentPlayerIndex];
   const isMyTurn = myPlayerIndex === currentPlayerIndex;
+
+  const prevIsMyTurn = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (onlinePhase !== "playing") {
+      prevIsMyTurn.current = isMyTurn;
+      return;
+    }
+    if (prevIsMyTurn.current === null) {
+      prevIsMyTurn.current = isMyTurn;
+      return;
+    }
+    if (isMyTurn && !prevIsMyTurn.current) {
+      playGameSound("your_turn");
+    } else if (!isMyTurn && prevIsMyTurn.current) {
+      playGameSound("turn_end");
+    }
+    prevIsMyTurn.current = isMyTurn;
+  }, [isMyTurn, onlinePhase]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-stone-950 via-amber-950 to-red-950 p-3 flex flex-col">
