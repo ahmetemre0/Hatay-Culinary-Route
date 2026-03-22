@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useOnlineStore } from "../store/onlineStore";
 import { GameCard } from "../components/GameCard";
 import { cn } from "@/lib/utils";
-import { Card, EventCard, MaterialCard, RegionCard } from "../data/cards";
+import { Card, EventCard, MaterialCard, FoodCard } from "../data/cards";
 
 function ActionFeed() {
   const messages = useOnlineStore((s) => s.messages);
@@ -23,14 +23,14 @@ function ActionFeed() {
   }, [messages]);
 
   return (
-    <div className="fixed bottom-28 right-3 z-50 flex flex-col gap-2 w-64 pointer-events-none">
+    <div className="fixed bottom-28 left-3 z-50 flex flex-col gap-2 w-64 pointer-events-none">
       <AnimatePresence>
         {toasts.map((msg) => (
           <motion.div
             key={msg.id}
-            initial={{ opacity: 0, x: 80, scale: 0.9 }}
+            initial={{ opacity: 0, x: -80, scale: 0.9 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 80, scale: 0.9 }}
+            exit={{ opacity: 0, x: -80, scale: 0.9 }}
             transition={{ type: "spring", stiffness: 300, damping: 25 }}
             className={cn(
               "px-4 py-2.5 rounded-xl text-sm shadow-xl backdrop-blur-sm border",
@@ -54,7 +54,7 @@ function OnlineEventModal() {
     pendingEvent,
     players,
     myPlayerIndex,
-    marketRegions,
+    marketFoods,
     resolveEvent,
     cancelEvent,
     selectedCards,
@@ -65,8 +65,8 @@ function OnlineEventModal() {
   if (onlinePhase !== "event_pending" || !pendingEvent) return null;
 
   const card = pendingEvent as EventCard;
-  const needsTarget = card.action === "skip_turn" || card.action === "steal_card" || card.action === "trade_two";
-  const needsMarketRegion = card.action === "multiply_points";
+  const needsTarget = card.action === "skip_turn" || card.action === "steal_card" || card.action === "trade_two" || card.action === "swap_all_cards";
+  const needsMarketFood = card.action === "multiply_points";
   const others = players.filter((_, i) => i !== myPlayerIndex);
 
   const handleTargetSelect = (targetPlayerIdx: number) => {
@@ -98,19 +98,19 @@ function OnlineEventModal() {
             <p className="text-white/60 text-sm mt-1">{card.description}</p>
           </div>
 
-          {needsMarketRegion && (
+          {needsMarketFood && (
             <div className="space-y-2 mb-4">
-              <p className="text-white/70 text-sm text-center">Hangi bölge kartının puanını 2x yapayım?</p>
+              <p className="text-white/70 text-sm text-center">Hangi siparişin puanını 2x yapayım?</p>
               <div className="flex gap-2 flex-wrap justify-center">
-                {marketRegions.map((r) => (
+                {marketFoods.map((f) => (
                   <motion.button
-                    key={r.id}
+                    key={f.id}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.97 }}
-                    onClick={() => resolveEvent(undefined, [r.id])}
+                    onClick={() => resolveEvent(undefined, [f.id])}
                     className="bg-white/10 hover:bg-white/20 text-white rounded-xl px-3 py-2 text-sm border border-white/10 hover:border-amber-400 transition-all"
                   >
-                    {r.emoji} {r.dish} (⭐{r.points})
+                    {f.emoji} {f.name} (⭐{f.points})
                   </motion.button>
                 ))}
               </div>
@@ -176,7 +176,7 @@ function OnlineEventModal() {
             >
               İptal
             </motion.button>
-            {!needsTarget && !needsMarketRegion && (
+            {!needsTarget && !needsMarketFood && (
               <motion.button
                 whileTap={{ scale: 0.97 }}
                 onClick={() => resolveEvent()}
@@ -193,7 +193,7 @@ function OnlineEventModal() {
 }
 
 function OtherPlayersArea() {
-  const { players, myPlayerIndex, currentPlayerIndex, cookingAnimation } = useOnlineStore();
+  const { players, myPlayerIndex, currentPlayerIndex } = useOnlineStore();
 
   const others = players
     .map((p, i) => ({ ...p, index: i }))
@@ -251,12 +251,12 @@ function OtherPlayersArea() {
               <div className="mt-1 text-red-400 text-xs text-center">⏸ Sıra atlanacak</div>
             )}
             {player.blockedFromRegion && (
-              <div className="mt-1 text-orange-400 text-xs text-center">🚫 Bölge yok</div>
+              <div className="mt-1 text-orange-400 text-xs text-center">🚫 Sipariş yok</div>
             )}
 
             <div className="mt-2">
               <div className="text-white/30 text-[10px] mb-0.5">
-                {player.scoredRegions.length} bölge
+                {player.scoredFoods.length} sipariş
               </div>
               <div className="w-full bg-white/10 rounded-full h-1">
                 <motion.div
@@ -274,7 +274,7 @@ function OtherPlayersArea() {
 
 function OnlineMarketArea() {
   const {
-    marketRegions,
+    marketFoods,
     drawDeckSize,
     discardPileSize,
     drawCard,
@@ -282,7 +282,7 @@ function OnlineMarketArea() {
     onlinePhase,
     hasDrawnThisTurn,
     cookingAnimation,
-    doubledMarketRegionId,
+    doubledMarketFoodId,
     myPlayerIndex,
     currentPlayerIndex,
   } = useOnlineStore();
@@ -319,16 +319,16 @@ function OnlineMarketArea() {
 
         <div className="flex flex-col gap-2">
           <div className="text-white/60 text-xs font-medium uppercase tracking-wider text-center">
-            🗺️ Pazar Alanı
+            🍽️ Sipariş Penceresi
           </div>
           <div className="flex gap-3 justify-center flex-wrap">
             <AnimatePresence>
-              {marketRegions.map((region) => {
-                const isDoubled = doubledMarketRegionId === region.id;
-                const isAnimating = cookingAnimation === region.id;
+              {marketFoods.map((food) => {
+                const isDoubled = doubledMarketFoodId === food.id;
+                const isAnimating = cookingAnimation === food.id;
                 return (
                   <motion.div
-                    key={region.id}
+                    key={food.id}
                     initial={{ opacity: 0, scale: 0.8, rotateY: 90 }}
                     animate={{ opacity: 1, scale: 1, rotateY: 0 }}
                     exit={{ opacity: 0, scale: 0.8 }}
@@ -344,8 +344,8 @@ function OnlineMarketArea() {
                       transition={{ duration: 0.5 }}
                     >
                       <GameCard
-                        card={region}
-                        onClick={canAct ? () => tryComplete(region.id) : undefined}
+                        card={food}
+                        onClick={canAct ? () => tryComplete(food.id) : undefined}
                         disabled={!canAct}
                         className={cn(isDoubled && "ring-2 ring-amber-400")}
                       />
@@ -354,9 +354,9 @@ function OnlineMarketArea() {
                 );
               })}
             </AnimatePresence>
-            {marketRegions.length === 0 && (
+            {marketFoods.length === 0 && (
               <div className="text-white/40 text-sm flex items-center justify-center h-40 w-40">
-                Pazar boş
+                Sipariş penceresi boş
               </div>
             )}
           </div>
@@ -445,7 +445,7 @@ function OnlinePlayerHand() {
 
       {selectedCards.length > 0 && (
         <div className="mt-2 text-center text-yellow-300 text-xs">
-          {selectedCards.length} kart seçildi — üstteki bölge kartına tıkla!
+          {selectedCards.length} kart seçildi — sipariş kartına tıkla!
         </div>
       )}
     </div>
@@ -551,7 +551,7 @@ export function OnlineGamePage() {
 
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-2xl">🗺️</span>
+          <span className="text-2xl">🍽️</span>
           <div>
             <h1 className="text-white font-bold text-sm leading-none">Hatay Gastronomi Rotası</h1>
             <p className={cn("text-xs", isMyTurn ? "text-amber-400 font-semibold" : "text-white/50")}>
@@ -628,7 +628,7 @@ export function OnlineGamePage() {
                       />
                     </div>
                     <div className="mt-1 text-white/40">
-                      {player.scoredRegions.length} bölge · {player.cardCount} kart
+                      {player.scoredFoods.length} sipariş · {player.cardCount} kart
                     </div>
                   </motion.div>
                 );
@@ -674,7 +674,7 @@ export function OnlineGamePage() {
       </div>
 
       <div className="mt-2 text-center text-white/20 text-xs">
-        {isMyTurn ? "Kart çek → Malzemeleri seç → Bölge kartına tıkla → Sırayı bitir" : "Diğer oyuncuların hamlesini bekle..."}
+        {isMyTurn ? "Kart çek → Malzemeleri seç → Sipariş kartına tıkla → Sırayı bitir" : "Diğer oyuncuların hamlesini bekle..."}
       </div>
     </div>
   );

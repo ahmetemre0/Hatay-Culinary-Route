@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import {
   Card,
-  RegionCard,
+  FoodCard,
   MaterialCard,
   EventCard,
   MaterialType,
@@ -13,7 +13,7 @@ export type Player = {
   id: number;
   name: string;
   hand: Card[];
-  scoredRegions: RegionCard[];
+  scoredFoods: FoodCard[];
   points: number;
   skippedNextTurn: boolean;
   blockedFromRegion: boolean;
@@ -37,9 +37,9 @@ type GameState = {
   phase: GamePhase;
   players: Player[];
   currentPlayerIndex: number;
-  marketRegions: RegionCard[];
+  marketFoods: FoodCard[];
   drawDeck: Card[];
-  regionDeck: RegionCard[];
+  foodDeck: FoodCard[];
   discardPile: Card[];
   selectedCards: string[];
   pendingEvent: EventCard | null;
@@ -53,12 +53,12 @@ type GameState = {
   canEndTurn: boolean;
   victoryPoints: number;
   cookingAnimation: string | null;
-  doubledMarketRegionId: string | null;
+  doubledMarketFoodId: string | null;
 
   startGame: (numPlayers: number, names: string[]) => void;
   drawCard: () => void;
   selectCard: (cardId: string) => void;
-  tryComplete: (regionId: string) => void;
+  tryComplete: (foodId: string) => void;
   useEventCard: (cardId: string) => void;
   resolveEvent: (targetPlayerId?: number, cardIds?: string[]) => void;
   cancelEvent: () => void;
@@ -67,15 +67,7 @@ type GameState = {
 };
 
 function makePlayer(id: number, name: string, hand: Card[]): Player {
-  return {
-    id,
-    name,
-    hand,
-    scoredRegions: [],
-    points: 0,
-    skippedNextTurn: false,
-    blockedFromRegion: false,
-  };
+  return { id, name, hand, scoredFoods: [], points: 0, skippedNextTurn: false, blockedFromRegion: false };
 }
 
 function addLog(
@@ -84,42 +76,33 @@ function addLog(
   text: string,
   type: GameLog["type"] = "info"
 ): { logs: GameLog[]; counter: number } {
-  const newLog: GameLog = { id: counter, text, type };
-  return {
-    logs: [newLog, ...logs].slice(0, 30),
-    counter: counter + 1,
-  };
+  return { logs: [{ id: counter, text, type }, ...logs].slice(0, 30), counter: counter + 1 };
 }
 
 function checkMaterials(hand: Card[], required: MaterialType[]): boolean {
-  const mats = hand.filter(
-    (c): c is MaterialCard => c.type === "material"
-  );
+  const mats = hand.filter((c): c is MaterialCard => c.type === "material");
   const req = [...required];
   for (const r of req) {
-    const joker = mats.find((m) => m.materialType === "Joker");
-    const exact = mats.find((m) => m.materialType === r);
-    if (!exact && !joker) return false;
+    const idx = mats.findIndex((m) => m.materialType === r);
+    if (idx !== -1) { mats.splice(idx, 1); continue; }
+    const joker = mats.findIndex((m) => m.materialType === "Joker");
+    if (joker !== -1) { mats.splice(joker, 1); continue; }
+    return false;
   }
   return true;
 }
 
 function consumeMaterials(hand: Card[], required: MaterialType[]): Card[] {
   let remaining = [...hand];
-  const req = [...required];
-  for (const r of req) {
+  for (const r of required) {
     const exactIdx = remaining.findIndex(
       (c): c is MaterialCard => c.type === "material" && c.materialType === r
     );
-    if (exactIdx !== -1) {
-      remaining.splice(exactIdx, 1);
-    } else {
-      const jokerIdx = remaining.findIndex(
-        (c): c is MaterialCard =>
-          c.type === "material" && c.materialType === "Joker"
-      );
-      if (jokerIdx !== -1) remaining.splice(jokerIdx, 1);
-    }
+    if (exactIdx !== -1) { remaining.splice(exactIdx, 1); continue; }
+    const jokerIdx = remaining.findIndex(
+      (c): c is MaterialCard => c.type === "material" && c.materialType === "Joker"
+    );
+    if (jokerIdx !== -1) remaining.splice(jokerIdx, 1);
   }
   return remaining;
 }
@@ -128,9 +111,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   phase: "setup",
   players: [],
   currentPlayerIndex: 0,
-  marketRegions: [],
+  marketFoods: [],
   drawDeck: [],
-  regionDeck: [],
+  foodDeck: [],
   discardPile: [],
   selectedCards: [],
   pendingEvent: null,
@@ -144,106 +127,67 @@ export const useGameStore = create<GameState>((set, get) => ({
   canEndTurn: false,
   victoryPoints: 50,
   cookingAnimation: null,
-  doubledMarketRegionId: null,
+  doubledMarketFoodId: null,
 
   startGame: (numPlayers, names) => {
-    const { regionDeck, materialEventDeck } = buildInitialDecks();
+    const { foodDeck, materialEventDeck } = buildInitialDecks();
     let deck = [...materialEventDeck];
 
     const players: Player[] = [];
     for (let i = 0; i < numPlayers; i++) {
-      const hand = deck.splice(0, 5);
-      players.push(makePlayer(i, names[i], hand));
+      players.push(makePlayer(i, names[i], deck.splice(0, 5)));
     }
 
-    const market: RegionCard[] = [];
-    let regDeck = [...regionDeck];
-    while (market.length < 3 && regDeck.length > 0) {
-      market.push(regDeck.shift()!);
-    }
+    const market: FoodCard[] = [];
+    let fDeck = [...foodDeck];
+    while (market.length < 3 && fDeck.length > 0) market.push(fDeck.shift()!);
 
     let logs: GameLog[] = [];
     let counter = 0;
-    const r = addLog(logs, counter, "Oyun başladı! İyi eğlenceler 🎉", "success");
-    logs = r.logs;
-    counter = r.counter;
-    const r2 = addLog(logs, counter, `${names[0]}'ın sırası`, "info");
-    logs = r2.logs;
-    counter = r2.counter;
+    let r = addLog(logs, counter, "Oyun başladı! İyi eğlenceler 🎉", "success");
+    logs = r.logs; counter = r.counter;
+    r = addLog(logs, counter, `${names[0]}'ın sırası`, "info");
+    logs = r.logs; counter = r.counter;
 
     set({
-      phase: "playing",
-      players,
-      currentPlayerIndex: 0,
-      marketRegions: market,
-      drawDeck: deck,
-      regionDeck: regDeck,
-      discardPile: [],
-      selectedCards: [],
-      logs,
-      logIdCounter: counter,
-      winnerIndex: null,
-      hasDrawnThisTurn: false,
-      canEndTurn: false,
-      doubledMarketRegionId: null,
+      phase: "playing", players, currentPlayerIndex: 0,
+      marketFoods: market, drawDeck: deck, foodDeck: fDeck, discardPile: [],
+      selectedCards: [], logs, logIdCounter: counter, winnerIndex: null,
+      hasDrawnThisTurn: false, canEndTurn: false, doubledMarketFoodId: null,
     });
   },
 
   drawCard: () => {
     const state = get();
-    if (state.hasDrawnThisTurn) return;
-    if (state.phase !== "playing") return;
+    if (state.hasDrawnThisTurn || state.phase !== "playing") return;
 
     let deck = [...state.drawDeck];
     let discard = [...state.discardPile];
 
     if (deck.length === 0) {
       if (discard.length === 0) {
-        let { logs, logIdCounter } = state;
-        const r = addLog(logs, logIdCounter, "Deste bitti! Oyun sona eriyor...", "warning");
-        logs = r.logs;
-        logIdCounter = r.counter;
         const winner = [...state.players].sort((a, b) => b.points - a.points)[0];
         const winIdx = state.players.findIndex((p) => p.id === winner.id);
-        set({ phase: "game_over", winnerIndex: winIdx, logs, logIdCounter });
+        const r = addLog(state.logs, state.logIdCounter, "Deste bitti!", "warning");
+        set({ phase: "game_over", winnerIndex: winIdx, logs: r.logs, logIdCounter: r.counter });
         return;
       }
       deck = shuffle([...discard]);
       discard = [];
-      let { logs, logIdCounter } = state;
-      const r = addLog(logs, logIdCounter, "Çöp destesi karıştırıldı!", "warning");
-      logs = r.logs;
-      logIdCounter = r.counter;
-      set({ drawDeck: deck, discardPile: discard, logs, logIdCounter });
+      const r = addLog(state.logs, state.logIdCounter, "Çöp destesi karıştırıldı!", "warning");
+      set({ drawDeck: deck, discardPile: discard, logs: r.logs, logIdCounter: r.counter });
     }
 
     const drawn = deck.shift()!;
-    const players = state.players.map((p, i) => {
-      if (i === state.currentPlayerIndex) {
-        return { ...p, hand: [...p.hand, drawn] };
-      }
-      return p;
-    });
-
-    let { logs, logIdCounter } = state;
-    const cur = state.players[state.currentPlayerIndex];
-    const r = addLog(
-      logs,
-      logIdCounter,
-      `${cur.name} bir kart çekti (${drawn.type === "material" ? (drawn as MaterialCard).name : drawn.type === "event" ? (drawn as EventCard).effectName : (drawn as RegionCard).dish})`,
-      "info"
+    const players = state.players.map((p, i) =>
+      i === state.currentPlayerIndex ? { ...p, hand: [...p.hand, drawn] } : p
     );
-    logs = r.logs;
-    logIdCounter = r.counter;
-
-    set({
-      players,
-      drawDeck: deck,
-      logs,
-      logIdCounter,
-      hasDrawnThisTurn: true,
-      canEndTurn: true,
-    });
+    const cur = state.players[state.currentPlayerIndex];
+    const cardName = drawn.type === "material" ? (drawn as MaterialCard).name
+      : drawn.type === "event" ? (drawn as EventCard).effectName
+      : (drawn as FoodCard).name;
+    const r = addLog(state.logs, state.logIdCounter, `${cur.name} bir kart çekti (${cardName})`, "info");
+    set({ players, drawDeck: deck, logs: r.logs, logIdCounter: r.counter, hasDrawnThisTurn: true, canEndTurn: true });
   },
 
   selectCard: (cardId) => {
@@ -255,85 +199,63 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ selectedCards: selected });
   },
 
-  tryComplete: (regionId) => {
+  tryComplete: (foodId) => {
     const state = get();
     if (state.phase !== "playing") return;
     const cur = state.players[state.currentPlayerIndex];
     if (cur.blockedFromRegion) {
-      let { logs, logIdCounter } = state;
-      const r = addLog(logs, logIdCounter, "Bu tur bölge tamamlayamazsın! (Sıcak Hava Dalgası)", "warning");
+      const r = addLog(state.logs, state.logIdCounter, "Bu tur sipariş tamamlayamazsın! (Sıcak Hava Dalgası)", "warning");
       set({ logs: r.logs, logIdCounter: r.counter });
       return;
     }
 
-    const region = state.marketRegions.find((r) => r.id === regionId);
-    if (!region) return;
+    const food = state.marketFoods.find((f) => f.id === foodId);
+    if (!food) return;
 
-    if (!checkMaterials(cur.hand, region.requiredMaterials)) {
-      let { logs, logIdCounter } = state;
-      const r = addLog(logs, logIdCounter, `Yeterli malzemen yok! (${region.requiredMaterials.join(", ")})`, "warning");
+    if (!checkMaterials(cur.hand, food.requiredMaterials)) {
+      const r = addLog(state.logs, state.logIdCounter, `Yeterli malzemen yok! (${food.requiredMaterials.join(", ")})`, "warning");
       set({ logs: r.logs, logIdCounter: r.counter });
       return;
     }
 
-    const newHand = consumeMaterials(cur.hand, region.requiredMaterials);
-    const newRegions = state.marketRegions.filter((r) => r.id !== regionId);
+    const newHand = consumeMaterials(cur.hand, food.requiredMaterials);
+    const newMarket = state.marketFoods.filter((f) => f.id !== foodId);
+    let newFoodDeck = [...state.foodDeck];
+    if (newFoodDeck.length > 0) newMarket.push(newFoodDeck.shift()!);
 
-    let newRegDeck = [...state.regionDeck];
-    if (newRegDeck.length > 0) {
-      newRegions.push(newRegDeck.shift()!);
-    }
+    const isDoubled = state.doubledMarketFoodId === food.id;
+    const earnedPoints = isDoubled ? food.points * 2 : food.points;
+    const totalPts = cur.points + earnedPoints;
 
-    const isDoubled = state.doubledMarketRegionId === region.id;
-    const earnedPoints = isDoubled ? region.points * 2 : region.points;
-    let totalPts = cur.points + earnedPoints;
-
-    const players = state.players.map((p, i) => {
-      if (i === state.currentPlayerIndex) {
-        return {
-          ...p,
-          hand: newHand,
-          scoredRegions: [...p.scoredRegions, region],
-          points: totalPts,
-        };
-      }
-      return p;
-    });
+    const players = state.players.map((p, i) =>
+      i === state.currentPlayerIndex
+        ? { ...p, hand: newHand, scoredFoods: [...p.scoredFoods, food], points: totalPts }
+        : p
+    );
 
     let { logs, logIdCounter } = state;
-    const r = addLog(
-      logs,
-      logIdCounter,
-      `🍽️ ${cur.name}, ${region.name} - ${region.dish} tamamladı! +${earnedPoints} puan${isDoubled ? " (2x Künefe Şöleni!)" : ""}`,
+    const r = addLog(logs, logIdCounter,
+      `🍽️ ${cur.name} "${food.name}" siparişini tamamladı! +${earnedPoints} puan${isDoubled ? " (2x!)" : ""}`,
       "success"
     );
-    logs = r.logs;
-    logIdCounter = r.counter;
+    logs = r.logs; logIdCounter = r.counter;
 
     const newState: Partial<GameState> = {
-      players,
-      marketRegions: newRegions,
-      regionDeck: newRegDeck,
-      selectedCards: [],
-      logs,
-      logIdCounter,
-      cookingAnimation: regionId,
-      doubledMarketRegionId: isDoubled ? null : state.doubledMarketRegionId,
+      players, marketFoods: newMarket, foodDeck: newFoodDeck,
+      selectedCards: [], logs, logIdCounter,
+      cookingAnimation: foodId,
+      doubledMarketFoodId: isDoubled ? null : state.doubledMarketFoodId,
     };
 
     if (totalPts >= state.victoryPoints) {
       newState.phase = "game_over";
       newState.winnerIndex = state.currentPlayerIndex;
       const r2 = addLog(logs, logIdCounter, `🏆 ${cur.name} kazandı! ${totalPts} puan!`, "success");
-      newState.logs = r2.logs;
-      newState.logIdCounter = r2.counter;
+      newState.logs = r2.logs; newState.logIdCounter = r2.counter;
     }
 
     set(newState);
-
-    setTimeout(() => {
-      set({ cookingAnimation: null });
-    }, 1500);
+    setTimeout(() => set({ cookingAnimation: null }), 1500);
   },
 
   useEventCard: (cardId) => {
@@ -346,63 +268,114 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (card.action === "draw_two") {
       let deck = [...state.drawDeck];
       const drawn: Card[] = [];
-      for (let i = 0; i < 2 && deck.length > 0; i++) {
-        drawn.push(deck.shift()!);
-      }
-      const newHand = cur.hand
-        .filter((c) => c.id !== cardId)
-        .concat(drawn);
+      for (let i = 0; i < 2 && deck.length > 0; i++) drawn.push(deck.shift()!);
       const players = state.players.map((p, i) =>
-        i === state.currentPlayerIndex ? { ...p, hand: newHand } : p
+        i === state.currentPlayerIndex
+          ? { ...p, hand: [...p.hand.filter((c) => c.id !== cardId), ...drawn] }
+          : p
       );
-      let { logs, logIdCounter } = state;
-      const r = addLog(logs, logIdCounter, `🌿 ${cur.name} "Bereketli Topraklar" kullandı! 2 kart çekti.`, "event");
+      const r = addLog(state.logs, state.logIdCounter, `🌿 ${cur.name} "Bereketli Topraklar" kullandı! 2 kart çekti.`, "event");
       set({ players, drawDeck: deck, logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] });
       return;
     }
 
-    if (card.action === "multiply_points") {
-      if (state.marketRegions.length === 0) {
-        let { logs, logIdCounter } = state;
-        const r = addLog(logs, logIdCounter, "Markette bölge kartı yok!", "warning");
-        set({ logs: r.logs, logIdCounter: r.counter });
-        return;
-      }
-      set({ pendingEvent: card, phase: "event_pending" });
-      return;
-    }
-
     if (card.action === "reshuffle_all") {
-      const allCards: Card[] = [...state.drawDeck, ...state.discardPile];
-      const players = state.players.map((p) => {
-        allCards.push(...p.hand.filter((c) => c.id !== cardId));
-        return { ...p, hand: [] };
+      // Yeni Asi Nehri Taştı: herkes elindeki kart sayısı kadar ek kart çeker
+      let deck = [...state.drawDeck];
+      const newPlayers = state.players.map((p) => {
+        const count = p.id === cur.id ? p.hand.filter((c) => c.id !== cardId).length : p.hand.length;
+        const drawn: Card[] = [];
+        for (let i = 0; i < count && deck.length > 0; i++) drawn.push(deck.shift()!);
+        if (p.id === cur.id) return { ...p, hand: [...p.hand.filter((c) => c.id !== cardId), ...drawn] };
+        return { ...p, hand: [...p.hand, ...drawn] };
       });
-      const shuffled = shuffle(allCards);
-      let idx = 0;
-      const newPlayers = players.map((p) => {
-        const hand: Card[] = [];
-        for (let i = 0; i < 5 && idx < shuffled.length; i++) hand.push(shuffled[idx++]);
-        return { ...p, hand };
-      });
-      const remaining = shuffled.slice(idx);
-      let { logs, logIdCounter } = state;
-      const r = addLog(logs, logIdCounter, `🌊 ${cur.name} "Asi Nehri Taştı" kullandı! Herkes yeniden çekti.`, "event");
-      set({ players: newPlayers, drawDeck: remaining, discardPile: [], logs: r.logs, logIdCounter: r.counter });
+      const r = addLog(state.logs, state.logIdCounter, `🌊 ${cur.name} "Asi Nehri Taştı" kullandı! Herkes ek kart çekti.`, "event");
+      set({ players: newPlayers, drawDeck: deck, discardPile: [...state.discardPile, card], logs: r.logs, logIdCounter: r.counter });
       return;
     }
 
     if (card.action === "block_region") {
       const newHand = cur.hand.filter((c) => c.id !== cardId);
-      const updatedPlayers = state.players.map((p, i) => {
-        if (i === state.currentPlayerIndex) {
-          return { ...p, hand: newHand, blockedFromRegion: false };
-        }
-        return { ...p, blockedFromRegion: true };
-      });
-      let { logs, logIdCounter } = state;
-      const r = addLog(logs, logIdCounter, `☀️ ${cur.name} "Sıcak Hava Dalgası" kullandı! Diğer oyuncular bir tur bölge tamamlayamaz.`, "event");
+      const updatedPlayers = state.players.map((p, i) => ({
+        ...p,
+        hand: i === state.currentPlayerIndex ? newHand : p.hand,
+        blockedFromRegion: i !== state.currentPlayerIndex,
+      }));
+      const r = addLog(state.logs, state.logIdCounter, `☀️ ${cur.name} "Sıcak Hava Dalgası" kullandı! Diğer oyuncular bir tur sipariş tamamlayamaz.`, "event");
       set({ players: updatedPlayers, logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] });
+      return;
+    }
+
+    if (card.action === "collect_all_meat") {
+      const meatCards: Card[] = [];
+      const newPlayers = state.players.map((p, i) => {
+        if (i === state.currentPlayerIndex) return { ...p, hand: p.hand.filter((c) => c.id !== cardId) };
+        const meats = p.hand.filter((c) => c.type === "material" && (c as MaterialCard).materialType === "Et");
+        meatCards.push(...meats);
+        return { ...p, hand: p.hand.filter((c) => !(c.type === "material" && (c as MaterialCard).materialType === "Et")) };
+      });
+      newPlayers[state.currentPlayerIndex].hand.push(...meatCards);
+      const r = addLog(state.logs, state.logIdCounter, `🥩 ${cur.name} "Etobur" kullandı! ${meatCards.length} Et kartı aldı.`, "event");
+      set({ players: newPlayers, logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] });
+      return;
+    }
+
+    if (card.action === "refresh_orders") {
+      const discarded = [...state.discardPile, ...state.marketFoods, card];
+      const newMarket: FoodCard[] = [];
+      let newFoodDeck = [...state.foodDeck];
+      while (newMarket.length < 3 && newFoodDeck.length > 0) newMarket.push(newFoodDeck.shift()!);
+      const newHand = cur.hand.filter((c) => c.id !== cardId);
+      const players = state.players.map((p, i) => i === state.currentPlayerIndex ? { ...p, hand: newHand } : p);
+      const r = addLog(state.logs, state.logIdCounter, `🍾 ${cur.name} "Araktini Kafa Yaptı" kullandı! Sipariş penceresi yenilendi.`, "event");
+      set({ players, marketFoods: newMarket, foodDeck: newFoodDeck, discardPile: discarded, logs: r.logs, logIdCounter: r.counter });
+      return;
+    }
+
+    if (card.action === "instant_points") {
+      const newHand = cur.hand.filter((c) => c.id !== cardId);
+      const players = state.players.map((p, i) =>
+        i === state.currentPlayerIndex ? { ...p, hand: newHand, points: p.points + 3 } : p
+      );
+      const r = addLog(state.logs, state.logIdCounter, `💝 ${cur.name} "Yaruhe Kalbek" kullandı! +3 puan.`, "event");
+      const newState: Partial<GameState> = { players, logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] };
+      if (cur.points + 3 >= state.victoryPoints) {
+        newState.phase = "game_over";
+        newState.winnerIndex = state.currentPlayerIndex;
+      }
+      set(newState);
+      return;
+    }
+
+    if (card.action === "multiply_lowest_points") {
+      const lowestFood = [...cur.scoredFoods].sort((a, b) => a.points - b.points)[0];
+      if (!lowestFood) {
+        const r = addLog(state.logs, state.logIdCounter, "Tamamlanmış siparişin yok!", "warning");
+        set({ logs: r.logs, logIdCounter: r.counter });
+        return;
+      }
+      const bonus = lowestFood.points;
+      const newHand = cur.hand.filter((c) => c.id !== cardId);
+      const players = state.players.map((p, i) =>
+        i === state.currentPlayerIndex ? { ...p, hand: newHand, points: p.points + bonus } : p
+      );
+      const r = addLog(state.logs, state.logIdCounter, `🏡 ${cur.name} "Memleket Hasreti" kullandı! "${lowestFood.name}" puanı 2x → +${bonus} puan.`, "event");
+      const newState: Partial<GameState> = { players, logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] };
+      if (cur.points + bonus >= state.victoryPoints) {
+        newState.phase = "game_over";
+        newState.winnerIndex = state.currentPlayerIndex;
+      }
+      set(newState);
+      return;
+    }
+
+    if (card.action === "multiply_points") {
+      if (state.marketFoods.length === 0) {
+        const r = addLog(state.logs, state.logIdCounter, "Sipariş penceresinde yemek yok!", "warning");
+        set({ logs: r.logs, logIdCounter: r.counter });
+        return;
+      }
+      set({ pendingEvent: card, phase: "event_pending" });
       return;
     }
 
@@ -422,8 +395,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         return p;
       });
       const target = state.players.find((p) => p.id === targetPlayerId)!;
-      let { logs, logIdCounter } = state;
-      const r = addLog(logs, logIdCounter, `🌶️ ${cur.name} "${card.effectName}" kullandı! ${target.name} sırasını atlıyor.`, "event");
+      const r = addLog(state.logs, state.logIdCounter, `🌶️ ${cur.name} "${card.effectName}" kullandı! ${target.name} sırasını atlıyor.`, "event");
       set({ players, phase: "playing", pendingEvent: null, logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] });
       return;
     }
@@ -432,25 +404,18 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (targetPlayerId === undefined) return;
       const targetPlayer = state.players.find((p) => p.id === targetPlayerId)!;
       if (targetPlayer.hand.length === 0) {
-        let { logs, logIdCounter } = state;
-        const r = addLog(logs, logIdCounter, "Hedef oyuncunun eli boş!", "warning");
+        const r = addLog(state.logs, state.logIdCounter, "Hedef oyuncunun eli boş!", "warning");
         set({ logs: r.logs, logIdCounter: r.counter, phase: "playing", pendingEvent: null });
         return;
       }
       const stolenIdx = Math.floor(Math.random() * targetPlayer.hand.length);
       const stolen = targetPlayer.hand[stolenIdx];
       const players = state.players.map((p) => {
-        if (p.id === targetPlayerId) {
-          return { ...p, hand: p.hand.filter((_, i) => i !== stolenIdx) };
-        }
-        if (p.id === cur.id) {
-          const newHand = p.hand.filter((c) => c.id !== card.id);
-          return { ...p, hand: [...newHand, stolen] };
-        }
+        if (p.id === targetPlayerId) return { ...p, hand: p.hand.filter((_, i) => i !== stolenIdx) };
+        if (p.id === cur.id) return { ...p, hand: [...p.hand.filter((c) => c.id !== card.id), stolen] };
         return p;
       });
-      let { logs, logIdCounter } = state;
-      const r = addLog(logs, logIdCounter, `🤝 ${cur.name} "${card.effectName}" kullandı! ${targetPlayer.name}'den kart çaldı.`, "event");
+      const r = addLog(state.logs, state.logIdCounter, `🤝 ${cur.name} "${card.effectName}" kullandı! ${targetPlayer.name}'den kart çaldı.`, "event");
       set({ players, phase: "playing", pendingEvent: null, logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] });
       return;
     }
@@ -460,12 +425,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       const targetPlayer = state.players.find((p) => p.id === targetPlayerId)!;
       const myCards = cardIds.slice(0, 2);
       const targetCards = targetPlayer.hand.slice(0, 2).map((c) => c.id);
-
       const players = state.players.map((p) => {
         if (p.id === cur.id) {
-          const kept = p.hand.filter(
-            (c) => c.id !== card.id && !myCards.includes(c.id)
-          );
+          const kept = p.hand.filter((c) => c.id !== card.id && !myCards.includes(c.id));
           const gained = targetPlayer.hand.filter((c) => targetCards.includes(c.id));
           return { ...p, hand: [...kept, ...gained] };
         }
@@ -476,32 +438,36 @@ export const useGameStore = create<GameState>((set, get) => ({
         }
         return p;
       });
-      let { logs, logIdCounter } = state;
-      const r = addLog(logs, logIdCounter, `🏪 ${cur.name} "Esnaf Dayanışması" kullandı! ${targetPlayer.name} ile 2 kart takas etti.`, "event");
+      const r = addLog(state.logs, state.logIdCounter, `🏪 ${cur.name} "${card.effectName}" kullandı! ${targetPlayer.name} ile 2 kart takas etti.`, "event");
       set({ players, phase: "playing", pendingEvent: null, logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] });
       return;
     }
 
     if (card.action === "multiply_points") {
       if (!cardIds || cardIds.length === 0) return;
-      const regionId = cardIds[0];
-      const region = state.marketRegions.find((r) => r.id === regionId);
-      if (!region) return;
+      const foodId = cardIds[0];
+      const food = state.marketFoods.find((f) => f.id === foodId);
+      if (!food) return;
       const newHand = cur.hand.filter((c) => c.id !== card.id);
       const players = state.players.map((p, i) =>
         i === state.currentPlayerIndex ? { ...p, hand: newHand } : p
       );
-      let { logs, logIdCounter } = state;
-      const r = addLog(logs, logIdCounter, `🧁 ${cur.name} "Künefe Şöleni" kullandı! ${region.name} - ${region.dish} kartının puanı 2x oldu!`, "event");
-      set({
-        players,
-        phase: "playing",
-        pendingEvent: null,
-        doubledMarketRegionId: regionId,
-        logs: r.logs,
-        logIdCounter: r.counter,
-        discardPile: [...state.discardPile, card],
+      const r = addLog(state.logs, state.logIdCounter, `🏰 ${cur.name} "Saray Caddesine Taşındık" kullandı! "${food.name}" kartının puanı 2x oldu!`, "event");
+      set({ players, phase: "playing", pendingEvent: null, doubledMarketFoodId: foodId, logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] });
+      return;
+    }
+
+    if (card.action === "swap_all_cards") {
+      if (targetPlayerId === undefined) return;
+      const targetPlayer = state.players.find((p) => p.id === targetPlayerId)!;
+      const myHandWithout = cur.hand.filter((c) => c.id !== card.id);
+      const players = state.players.map((p) => {
+        if (p.id === cur.id) return { ...p, hand: [...targetPlayer.hand, ...myHandWithout.filter((c) => c.id !== card.id)] };
+        if (p.id === targetPlayerId) return { ...p, hand: myHandWithout };
+        return p;
       });
+      const r = addLog(state.logs, state.logIdCounter, `🔄 ${cur.name} "Cınno Nıtto" kullandı! ${targetPlayer.name} ile tüm kartları takas etti.`, "event");
+      set({ players, phase: "playing", pendingEvent: null, logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] });
       return;
     }
 
@@ -525,55 +491,32 @@ export const useGameStore = create<GameState>((set, get) => ({
     }));
 
     let skipped = 0;
+    let { logs, logIdCounter } = state;
     while (players[nextIdx].skippedNextTurn && skipped < numPlayers) {
-      const skippedPlayer = players[nextIdx];
-      let { logs, logIdCounter } = state;
-      const r = addLog(logs, logIdCounter, `${skippedPlayer.name} sırasını atlıyor!`, "warning");
-      state.logs = r.logs;
-      state.logIdCounter = r.counter;
+      const skippedP = players[nextIdx];
+      const r = addLog(logs, logIdCounter, `${skippedP.name} sırasını atlıyor!`, "warning");
+      logs = r.logs; logIdCounter = r.counter;
       players = players.map((p) =>
-        p.id === skippedPlayer.id ? { ...p, skippedNextTurn: false } : p
+        p.id === skippedP.id ? { ...p, skippedNextTurn: false } : p
       );
       nextIdx = (nextIdx + 1) % numPlayers;
       skipped++;
     }
 
-    const nextPlayer = players[nextIdx];
-    let { logs, logIdCounter } = state;
-    const r = addLog(logs, logIdCounter, `${nextPlayer.name}'ın sırası`, "info");
-    logs = r.logs;
-    logIdCounter = r.counter;
+    const r = addLog(logs, logIdCounter, `${players[nextIdx].name}'ın sırası`, "info");
+    logs = r.logs; logIdCounter = r.counter;
 
-    set({
-      players,
-      currentPlayerIndex: nextIdx,
-      selectedCards: [],
-      logs,
-      logIdCounter,
-      hasDrawnThisTurn: false,
-      canEndTurn: false,
-    });
+    set({ players, currentPlayerIndex: nextIdx, selectedCards: [], logs, logIdCounter, hasDrawnThisTurn: false, canEndTurn: false });
   },
 
   resetGame: () => {
     set({
-      phase: "setup",
-      players: [],
-      currentPlayerIndex: 0,
-      marketRegions: [],
-      drawDeck: [],
-      regionDeck: [],
-      discardPile: [],
-      selectedCards: [],
-      pendingEvent: null,
-      pendingEventTarget: null,
-      logs: [],
-      logIdCounter: 0,
-      winnerIndex: null,
-      hasDrawnThisTurn: false,
-      canEndTurn: false,
-      cookingAnimation: null,
-      doubledMarketRegionId: null,
+      phase: "setup", players: [], currentPlayerIndex: 0,
+      marketFoods: [], drawDeck: [], foodDeck: [], discardPile: [],
+      selectedCards: [], pendingEvent: null, pendingEventTarget: null,
+      logs: [], logIdCounter: 0, winnerIndex: null,
+      hasDrawnThisTurn: false, canEndTurn: false,
+      cookingAnimation: null, doubledMarketFoodId: null,
     });
   },
 }));

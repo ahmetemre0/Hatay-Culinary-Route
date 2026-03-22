@@ -5,9 +5,9 @@ import { cn } from "@/lib/utils";
 
 export function MarketArea() {
   const {
-    marketRegions,
+    marketFoods,
     drawDeck,
-    regionDeck,
+    foodDeck,
     discardPile,
     drawCard,
     tryComplete,
@@ -16,7 +16,7 @@ export function MarketArea() {
     phase,
     hasDrawnThisTurn,
     cookingAnimation,
-    doubledMarketRegionId,
+    doubledMarketFoodId,
   } = useGameStore();
 
   const current = players[currentPlayerIndex];
@@ -47,15 +47,15 @@ export function MarketArea() {
 
         <div className="flex flex-col gap-2">
           <div className="text-white/60 text-xs font-medium uppercase tracking-wider text-center">
-            🗺️ Pazar Alanı
+            🍽️ Sipariş Penceresi
           </div>
           <div className="flex gap-3 justify-center flex-wrap">
             <AnimatePresence>
-              {marketRegions.map((region) => {
-                const isDoubled = doubledMarketRegionId === region.id;
+              {marketFoods.map((food) => {
+                const isDoubled = doubledMarketFoodId === food.id;
                 return (
                   <motion.div
-                    key={region.id}
+                    key={food.id}
                     initial={{ opacity: 0, scale: 0.8, rotateY: 90 }}
                     animate={{ opacity: 1, scale: 1, rotateY: 0 }}
                     exit={{ opacity: 0, scale: 0.5, y: -40 }}
@@ -63,11 +63,11 @@ export function MarketArea() {
                     className="relative"
                   >
                     <GameCard
-                      card={region}
-                      onClick={() => tryComplete(region.id)}
+                      card={food}
+                      onClick={() => tryComplete(food.id)}
                       disabled={phase !== "playing" || current?.blockedFromRegion}
                       className={cn(
-                        cookingAnimation === region.id && "ring-4 ring-yellow-400 ring-offset-2",
+                        cookingAnimation === food.id && "ring-4 ring-yellow-400 ring-offset-2",
                         isDoubled && "ring-4 ring-green-400 ring-offset-2 ring-offset-transparent"
                       )}
                     />
@@ -82,7 +82,7 @@ export function MarketArea() {
                       </motion.div>
                     )}
 
-                    {cookingAnimation === region.id && (
+                    {cookingAnimation === food.id && (
                       <motion.div
                         initial={{ opacity: 0, scale: 0.5 }}
                         animate={{ opacity: 1, scale: 1.3 }}
@@ -94,19 +94,19 @@ export function MarketArea() {
                     )}
 
                     <div className="mt-1 text-center text-[10px] text-white/60">
-                      {region.requiredMaterials.join(" + ")}
+                      {food.requiredMaterials.join(" + ")}
                       {isDoubled && (
                         <span className="ml-1 text-green-400 font-bold">
-                          → ⭐{region.points * 2}
+                          → ⭐{food.points * 2}
                         </span>
                       )}
                     </div>
                   </motion.div>
                 );
               })}
-              {marketRegions.length === 0 && regionDeck.length === 0 && (
+              {marketFoods.length === 0 && foodDeck.length === 0 && (
                 <div className="w-56 h-40 rounded-xl border-2 border-dashed border-white/20 flex items-center justify-center text-white/40 text-sm">
-                  Bölge kalmadı
+                  Sipariş kalmadı
                 </div>
               )}
             </AnimatePresence>
@@ -128,12 +128,12 @@ export function MarketArea() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center text-orange-400 text-xs font-medium bg-orange-950/40 border border-orange-500/30 rounded-xl py-1.5"
         >
-          ☀️ Sıcak Hava Dalgası — Bu tur bölge tamamlayamazsın!
+          ☀️ Sıcak Hava Dalgası — Bu tur sipariş tamamlayamazsın!
         </motion.div>
       )}
 
       <div className="text-center text-white/50 text-xs">
-        Bölge Destesi: {regionDeck.length} kart kaldı
+        Sipariş Destesi: {foodDeck.length} kart kaldı
       </div>
     </div>
   );

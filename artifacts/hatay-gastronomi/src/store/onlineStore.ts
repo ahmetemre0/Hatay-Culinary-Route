@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { io, Socket } from "socket.io-client";
-import { Card, EventCard, RegionCard } from "../data/cards";
+import { Card, EventCard, FoodCard } from "../data/cards";
 
 export type OnlineMessage = {
   id: number;
@@ -12,7 +12,7 @@ export type OnlinePlayerInfo = {
   name: string;
   cardCount: number;
   points: number;
-  scoredRegions: RegionCard[];
+  scoredFoods: FoodCard[];
   skippedNextTurn: boolean;
   blockedFromRegion: boolean;
 };
@@ -32,11 +32,11 @@ export type PlayerView = {
   players: OnlinePlayerInfo[];
   myHand: Card[];
   currentPlayerIndex: number;
-  marketRegions: RegionCard[];
+  marketFoods: FoodCard[];
   drawDeckSize: number;
   discardPileSize: number;
-  regionDeckSize: number;
-  doubledMarketRegionId: string | null;
+  foodDeckSize: number;
+  doubledMarketFoodId: string | null;
   messages: OnlineMessage[];
   winnerIndex: number | null;
   hasDrawnThisTurn: boolean;
@@ -49,9 +49,7 @@ export type PlayerView = {
 const SESSION_KEY = "hatay_game_session";
 
 function saveSession(roomCode: string, playerName: string) {
-  try {
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ roomCode, playerName }));
-  } catch {}
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify({ roomCode, playerName })); } catch {}
 }
 
 function loadSession(): { roomCode: string; playerName: string } | null {
@@ -80,11 +78,11 @@ type OnlineState = {
   players: OnlinePlayerInfo[];
   myHand: Card[];
   currentPlayerIndex: number;
-  marketRegions: RegionCard[];
+  marketFoods: FoodCard[];
   drawDeckSize: number;
   discardPileSize: number;
-  regionDeckSize: number;
-  doubledMarketRegionId: string | null;
+  foodDeckSize: number;
+  doubledMarketFoodId: string | null;
   messages: OnlineMessage[];
   winnerIndex: number | null;
   hasDrawnThisTurn: boolean;
@@ -103,7 +101,7 @@ type OnlineState = {
   leaveRoom: () => void;
   drawCard: () => void;
   selectCard: (cardId: string) => void;
-  tryComplete: (regionId: string) => void;
+  tryComplete: (foodId: string) => void;
   useEventCard: (cardId: string) => void;
   resolveEvent: (targetPlayerId?: number, cardIds?: string[]) => void;
   cancelEvent: () => void;
@@ -130,11 +128,11 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
   players: [],
   myHand: [],
   currentPlayerIndex: 0,
-  marketRegions: [],
+  marketFoods: [],
   drawDeckSize: 0,
   discardPileSize: 0,
-  regionDeckSize: 0,
-  doubledMarketRegionId: null,
+  foodDeckSize: 0,
+  doubledMarketFoodId: null,
   messages: [],
   winnerIndex: null,
   hasDrawnThisTurn: false,
@@ -167,13 +165,8 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       }
     });
 
-    socket.on("disconnect", () => {
-      set({ connected: false });
-    });
-
-    socket.on("connect_error", (err) => {
-      set({ errorMessage: `Bağlantı hatası: ${err.message}` });
-    });
+    socket.on("disconnect", () => { set({ connected: false }); });
+    socket.on("connect_error", (err) => { set({ errorMessage: `Bağlantı hatası: ${err.message}` }); });
 
     socket.on("room_joined", ({ roomCode }: { roomCode: string }) => {
       const { playerName } = get();
@@ -181,10 +174,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       set({ roomCode, onlinePhase: "waiting_room" });
     });
 
-    socket.on("rejoin_ok", () => {
-      set({ errorMessage: null });
-    });
-
+    socket.on("rejoin_ok", () => { set({ errorMessage: null }); });
     socket.on("rejoin_failed", ({ message }: { message: string }) => {
       clearSession();
       set({ errorMessage: message, onlinePhase: "idle" });
@@ -207,11 +197,11 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
         players: view.players,
         myHand: view.myHand,
         currentPlayerIndex: view.currentPlayerIndex,
-        marketRegions: view.marketRegions,
+        marketFoods: view.marketFoods,
         drawDeckSize: view.drawDeckSize,
         discardPileSize: view.discardPileSize,
-        regionDeckSize: view.regionDeckSize,
-        doubledMarketRegionId: view.doubledMarketRegionId,
+        foodDeckSize: view.foodDeckSize,
+        doubledMarketFoodId: view.doubledMarketFoodId,
         messages: view.messages,
         winnerIndex: view.winnerIndex,
         hasDrawnThisTurn: view.hasDrawnThisTurn,
@@ -226,9 +216,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       });
     });
 
-    socket.on("error_msg", ({ message }: { message: string }) => {
-      set({ errorMessage: message });
-    });
+    socket.on("error_msg", ({ message }: { message: string }) => { set({ errorMessage: message }); });
 
     set({ socket });
   },
@@ -258,29 +246,15 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     set({ playerName: name });
   },
 
-  startGame: () => {
-    const { socket } = get();
-    socket?.emit("start_game");
-  },
+  startGame: () => { get().socket?.emit("start_game"); },
 
   leaveRoom: () => {
-    const { socket } = get();
-    socket?.emit("leave_room");
+    get().socket?.emit("leave_room");
     clearSession();
-    set({
-      onlinePhase: "idle",
-      roomCode: "",
-      isHost: false,
-      players: [],
-      myHand: [],
-      messages: [],
-    });
+    set({ onlinePhase: "idle", roomCode: "", isHost: false, players: [], myHand: [], messages: [] });
   },
 
-  drawCard: () => {
-    const { socket } = get();
-    socket?.emit("draw_card");
-  },
+  drawCard: () => { get().socket?.emit("draw_card"); },
 
   selectCard: (cardId) => {
     const state = get();
@@ -290,31 +264,18 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     set({ selectedCards: selected });
   },
 
-  tryComplete: (regionId) => {
-    const { socket } = get();
-    socket?.emit("try_complete", { regionId });
-  },
+  tryComplete: (foodId) => { get().socket?.emit("try_complete", { regionId: foodId }); },
 
-  useEventCard: (cardId) => {
-    const { socket } = get();
-    socket?.emit("use_event_card", { cardId });
-  },
+  useEventCard: (cardId) => { get().socket?.emit("use_event_card", { cardId }); },
 
   resolveEvent: (targetPlayerId, cardIds) => {
-    const { socket } = get();
-    socket?.emit("resolve_event", { targetPlayerId, cardIds });
+    get().socket?.emit("resolve_event", { targetPlayerId, cardIds });
     set({ selectedCards: [] });
   },
 
-  cancelEvent: () => {
-    const { socket } = get();
-    socket?.emit("cancel_event");
-  },
+  cancelEvent: () => { get().socket?.emit("cancel_event"); },
 
-  endTurn: () => {
-    const { socket } = get();
-    socket?.emit("end_turn");
-  },
+  endTurn: () => { get().socket?.emit("end_turn"); },
 
   clearError: () => set({ errorMessage: null }),
 
@@ -324,29 +285,13 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     socket?.disconnect();
     clearSession();
     set({
-      socket: null,
-      connected: false,
-      onlinePhase: "idle",
-      errorMessage: null,
-      playerName: "",
-      roomCode: "",
-      isHost: false,
-      myPlayerIndex: -1,
-      players: [],
-      myHand: [],
-      currentPlayerIndex: 0,
-      marketRegions: [],
-      drawDeckSize: 0,
-      discardPileSize: 0,
-      regionDeckSize: 0,
-      doubledMarketRegionId: null,
-      messages: [],
-      winnerIndex: null,
-      hasDrawnThisTurn: false,
-      canEndTurn: false,
-      pendingEvent: null,
-      cookingAnimation: null,
-      selectedCards: [],
+      socket: null, connected: false, onlinePhase: "idle", errorMessage: null,
+      playerName: "", roomCode: "", isHost: false, myPlayerIndex: -1,
+      players: [], myHand: [], currentPlayerIndex: 0,
+      marketFoods: [], drawDeckSize: 0, discardPileSize: 0, foodDeckSize: 0,
+      doubledMarketFoodId: null, messages: [], winnerIndex: null,
+      hasDrawnThisTurn: false, canEndTurn: false, pendingEvent: null,
+      cookingAnimation: null, selectedCards: [],
     });
   },
 }));

@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
 import { useGameStore } from "../store/gameStore";
-import { GameCard } from "./GameCard";
 import { cn } from "@/lib/utils";
 
 export function Scoreboard() {
@@ -67,20 +66,20 @@ export function Scoreboard() {
                 </div>
 
                 <div className="text-[10px] text-white/50">
-                  {player.scoredRegions.length} bölge tamamlandı
+                  {player.scoredFoods.length} sipariş tamamlandı
                   {player.skippedNextTurn && (
                     <span className="ml-1 text-red-400">⏸ atlanacak</span>
                   )}
                 </div>
 
-                {player.scoredRegions.length > 0 && (
+                {player.scoredFoods.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2">
-                    {player.scoredRegions.slice(-4).map((r) => (
+                    {player.scoredFoods.slice(-4).map((f) => (
                       <span
-                        key={r.id + "-scored"}
+                        key={f.id + "-scored"}
                         className="text-xs bg-white/10 rounded px-1 py-0.5 text-white/70 flex items-center gap-0.5"
                       >
-                        {r.emoji} {r.name}
+                        {f.emoji} {f.name}
                       </span>
                     ))}
                   </div>

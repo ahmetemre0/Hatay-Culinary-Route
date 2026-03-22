@@ -1,4 +1,4 @@
-import { Card, RegionCard, EventCard, MaterialCard, MaterialType, buildInitialDecks, shuffle } from "./cards.js";
+import { Card, FoodCard, EventCard, MaterialCard, MaterialType, buildInitialDecks, shuffle } from "./cards.js";
 
 export type GameMessage = {
   id: number;
@@ -10,7 +10,7 @@ export type ServerPlayer = {
   name: string;
   socketId: string;
   hand: Card[];
-  scoredRegions: RegionCard[];
+  scoredFoods: FoodCard[];
   points: number;
   skippedNextTurn: boolean;
   blockedFromRegion: boolean;
@@ -22,9 +22,9 @@ export type ServerGameState = {
   phase: GamePhase;
   players: ServerPlayer[];
   currentPlayerIndex: number;
-  marketRegions: RegionCard[];
+  marketFoods: FoodCard[];
   drawDeck: Card[];
-  regionDeck: RegionCard[];
+  foodDeck: FoodCard[];
   discardPile: Card[];
   selectedCards: string[];
   pendingEvent: EventCard | null;
@@ -34,7 +34,7 @@ export type ServerGameState = {
   hasDrawnThisTurn: boolean;
   canEndTurn: boolean;
   cookingAnimation: string | null;
-  doubledMarketRegionId: string | null;
+  doubledMarketFoodId: string | null;
   victoryPoints: number;
 };
 
@@ -53,9 +53,9 @@ function makeInitialState(): ServerGameState {
     phase: "lobby",
     players: [],
     currentPlayerIndex: 0,
-    marketRegions: [],
+    marketFoods: [],
     drawDeck: [],
-    regionDeck: [],
+    foodDeck: [],
     discardPile: [],
     selectedCards: [],
     pendingEvent: null,
@@ -65,7 +65,7 @@ function makeInitialState(): ServerGameState {
     hasDrawnThisTurn: false,
     canEndTurn: false,
     cookingAnimation: null,
-    doubledMarketRegionId: null,
+    doubledMarketFoodId: null,
     victoryPoints: 50,
   };
 }
@@ -82,7 +82,7 @@ export function createRoom(hostSocketId: string, playerName: string): Room {
   while (rooms.has(code)) code = generateCode();
 
   const state = makeInitialState();
-  state.players.push({ name: playerName, socketId: hostSocketId, hand: [], scoredRegions: [], points: 0, skippedNextTurn: false, blockedFromRegion: false });
+  state.players.push({ name: playerName, socketId: hostSocketId, hand: [], scoredFoods: [], points: 0, skippedNextTurn: false, blockedFromRegion: false });
   addMessage(state, `${playerName} odayı oluşturdu`, "info");
 
   const room: Room = { code, hostSocketId, state };
@@ -98,7 +98,7 @@ export function joinRoom(socketId: string, code: string, playerName: string): { 
   if (room.state.players.length >= 4) return { room: null!, error: "Oda dolu! (Max 4 oyuncu)" };
   if (room.state.players.some(p => p.socketId === socketId)) return { room, error: undefined };
 
-  room.state.players.push({ name: playerName, socketId, hand: [], scoredRegions: [], points: 0, skippedNextTurn: false, blockedFromRegion: false });
+  room.state.players.push({ name: playerName, socketId, hand: [], scoredFoods: [], points: 0, skippedNextTurn: false, blockedFromRegion: false });
   addMessage(room.state, `${playerName} odaya katıldı`, "info");
   socketToRoom.set(socketId, code.toUpperCase());
   return { room };
@@ -127,9 +127,7 @@ export function rejoinRoom(newSocketId: string, code: string, playerName: string
   socketToRoom.delete(oldSocketId);
   socketToRoom.set(newSocketId, code.toUpperCase());
 
-  if (room.hostSocketId === oldSocketId) {
-    room.hostSocketId = newSocketId;
-  }
+  if (room.hostSocketId === oldSocketId) room.hostSocketId = newSocketId;
 
   addMessage(room.state, `${playerName} yeniden bağlandı`, "info");
   return { room };
@@ -151,9 +149,7 @@ export function removePlayer(socketId: string): { room: Room | null; wasHost: bo
       rooms.delete(room.code);
       return { room: null, wasHost, playerName };
     }
-    if (wasHost && room.state.players.length > 0) {
-      room.hostSocketId = room.state.players[0].socketId;
-    }
+    if (wasHost && room.state.players.length > 0) room.hostSocketId = room.state.players[0].socketId;
     addMessage(room.state, `${playerName} odadan ayrıldı`, "warning");
   } else {
     addMessage(room.state, `${playerName} bağlantısı kesildi`, "warning");
@@ -166,28 +162,28 @@ export function startGame(room: Room): string | null {
   const state = room.state;
   if (state.players.length < 2) return "En az 2 oyuncu gerekli!";
 
-  const { regionDeck, materialEventDeck } = buildInitialDecks();
+  const { foodDeck, materialEventDeck } = buildInitialDecks();
   let deck = [...materialEventDeck];
 
   state.players = state.players.map(p => {
     const hand = deck.splice(0, 5);
-    return { ...p, hand, scoredRegions: [], points: 0, skippedNextTurn: false, blockedFromRegion: false };
+    return { ...p, hand, scoredFoods: [], points: 0, skippedNextTurn: false, blockedFromRegion: false };
   });
 
-  const market: RegionCard[] = [];
-  let regDeck = [...regionDeck];
-  while (market.length < 3 && regDeck.length > 0) market.push(regDeck.shift()!);
+  const market: FoodCard[] = [];
+  let fDeck = [...foodDeck];
+  while (market.length < 3 && fDeck.length > 0) market.push(fDeck.shift()!);
 
   state.phase = "playing";
   state.drawDeck = deck;
-  state.regionDeck = regDeck;
-  state.marketRegions = market;
+  state.foodDeck = fDeck;
+  state.marketFoods = market;
   state.discardPile = [];
   state.currentPlayerIndex = 0;
   state.winnerIndex = null;
   state.hasDrawnThisTurn = false;
   state.canEndTurn = false;
-  state.doubledMarketRegionId = null;
+  state.doubledMarketFoodId = null;
   state.pendingEvent = null;
   state.cookingAnimation = null;
   state.messages = [];
@@ -246,36 +242,35 @@ export function handleDrawCard(room: Room, socketId: string): string | null {
   cur.hand.push(drawn);
   state.hasDrawnThisTurn = true;
   state.canEndTurn = true;
-  const label = drawn.type === "material" ? (drawn as MaterialCard).name : drawn.type === "event" ? (drawn as EventCard).effectName : (drawn as RegionCard).dish;
   addMessage(state, `${cur.name} kart çekti`, "info");
   return null;
 }
 
-export function handleTryComplete(room: Room, socketId: string, regionId: string): string | null {
+export function handleTryComplete(room: Room, socketId: string, foodId: string): string | null {
   const state = room.state;
   if (state.phase !== "playing") return "Yanlış aşama!";
   const cur = state.players[state.currentPlayerIndex];
   if (cur.socketId !== socketId) return "Sıra sende değil!";
-  if (cur.blockedFromRegion) return "Bu tur bölge tamamlayamazsın! (Sıcak Hava Dalgası)";
+  if (cur.blockedFromRegion) return "Bu tur sipariş tamamlayamazsın! (Sıcak Hava Dalgası)";
 
-  const region = state.marketRegions.find(r => r.id === regionId);
-  if (!region) return "Bölge bulunamadı!";
-  if (!checkMaterials(cur.hand, region.requiredMaterials)) return `Yeterli malzemen yok! (${region.requiredMaterials.join(", ")})`;
+  const food = state.marketFoods.find(f => f.id === foodId);
+  if (!food) return "Sipariş bulunamadı!";
+  if (!checkMaterials(cur.hand, food.requiredMaterials)) return `Yeterli malzemen yok! (${food.requiredMaterials.join(", ")})`;
 
-  cur.hand = consumeMaterials(cur.hand, region.requiredMaterials);
-  state.marketRegions = state.marketRegions.filter(r => r.id !== regionId);
-  if (state.regionDeck.length > 0) state.marketRegions.push(state.regionDeck.shift()!);
+  cur.hand = consumeMaterials(cur.hand, food.requiredMaterials);
+  state.marketFoods = state.marketFoods.filter(f => f.id !== foodId);
+  if (state.foodDeck.length > 0) state.marketFoods.push(state.foodDeck.shift()!);
 
-  const isDoubled = state.doubledMarketRegionId === regionId;
-  const earned = isDoubled ? region.points * 2 : region.points;
+  const isDoubled = state.doubledMarketFoodId === foodId;
+  const earned = isDoubled ? food.points * 2 : food.points;
   cur.points += earned;
-  cur.scoredRegions.push(region);
-  if (isDoubled) state.doubledMarketRegionId = null;
+  cur.scoredFoods.push(food);
+  if (isDoubled) state.doubledMarketFoodId = null;
 
-  state.cookingAnimation = regionId;
-  setTimeout(() => { if (room.state.cookingAnimation === regionId) room.state.cookingAnimation = null; }, 1500);
+  state.cookingAnimation = foodId;
+  setTimeout(() => { if (room.state.cookingAnimation === foodId) room.state.cookingAnimation = null; }, 1500);
 
-  addMessage(state, `🍽️ ${cur.name}, ${region.name} - ${region.dish} tamamladı! +${earned} puan${isDoubled ? " (2x!)" : ""}`, "success");
+  addMessage(state, `🍽️ ${cur.name}, ${food.emoji} ${food.name} tamamladı! +${earned} puan${isDoubled ? " (2x!)" : ""}`, "success");
 
   if (cur.points >= state.victoryPoints) {
     state.phase = "game_over";
@@ -295,51 +290,133 @@ export function handleUseEventCard(room: Room, socketId: string, cardId: string)
   const card = cur.hand.find(c => c.id === cardId) as EventCard | undefined;
   if (!card || card.type !== "event") return { error: "Geçersiz kart!" };
 
+  // draw_two — Bereketli Topraklar
   if (card.action === "draw_two") {
     const drawn: Card[] = [];
     for (let i = 0; i < 2 && state.drawDeck.length > 0; i++) drawn.push(state.drawDeck.shift()!);
     cur.hand = cur.hand.filter(c => c.id !== cardId).concat(drawn);
     state.discardPile.push(card);
-    addMessage(state, `🌿 ${cur.name} "Bereketli Topraklar" kullandı! 2 kart çekti.`, "event");
+    addMessage(state, `🌿 ${cur.name} "${card.effectName}" kullandı! 2 kart çekti.`, "event");
     return {};
   }
 
+  // reshuffle_all — Asi Nehri Taştı: each player draws N extra cards = their current hand size
   if (card.action === "reshuffle_all") {
-    // Collect ALL cards: draw + discard + all hands (excluding the played card)
-    const allCards: Card[] = [...state.drawDeck, ...state.discardPile];
+    cur.hand = cur.hand.filter(c => c.id !== cardId);
+    state.discardPile.push(card);
+    // Refill draw deck if needed
+    if (state.drawDeck.length < 20 && state.discardPile.length > 0) {
+      const recycled = shuffle([...state.discardPile]);
+      state.drawDeck = [...state.drawDeck, ...recycled];
+      state.discardPile = [];
+    }
     state.players.forEach(p => {
-      allCards.push(...p.hand.filter(c => c.id !== cardId));
-      p.hand = [];
+      const extraCount = p.hand.length;
+      const drawn: Card[] = [];
+      for (let i = 0; i < extraCount && state.drawDeck.length > 0; i++) drawn.push(state.drawDeck.shift()!);
+      p.hand = [...p.hand, ...drawn];
     });
-    const shuffled = shuffle(allCards);
-    let idx = 0;
-    state.players.forEach(p => {
-      p.hand = [];
-      for (let i = 0; i < 5 && idx < shuffled.length; i++) p.hand.push(shuffled[idx++]);
-    });
-    state.drawDeck = shuffled.slice(idx);
-    state.discardPile = [];
-    addMessage(state, `🌊 ${cur.name} "Asi Nehri Taştı" kullandı! Herkes yeniden çekti.`, "event");
+    addMessage(state, `🌊 ${cur.name} "${card.effectName}" kullandı! Herkes elindeki kadar ekstra kart çekti.`, "event");
     return {};
   }
 
+  // block_region — Sıcak Hava Dalgası
   if (card.action === "block_region") {
     state.players.forEach((p, i) => {
       if (i !== state.currentPlayerIndex) p.blockedFromRegion = true;
     });
     cur.hand = cur.hand.filter(c => c.id !== cardId);
     state.discardPile.push(card);
-    addMessage(state, `☀️ ${cur.name} "Sıcak Hava Dalgası" kullandı! Diğer oyuncular bir tur bölge tamamlayamaz.`, "event");
+    addMessage(state, `☀️ ${cur.name} "${card.effectName}" kullandı! Diğer oyuncular bir tur sipariş tamamlayamaz.`, "event");
     return {};
   }
 
+  // multiply_points — Künefe Şöleni (needs food selection)
   if (card.action === "multiply_points") {
-    if (state.marketRegions.length === 0) return { error: "Markette bölge kartı yok!" };
+    if (state.marketFoods.length === 0) return { error: "Sipariş penceresi boş!" };
     state.pendingEvent = card;
     state.phase = "event_pending";
     return { needsTarget: true };
   }
 
+  // collect_all_meat — Kasap İndirimi
+  if (card.action === "collect_all_meat") {
+    cur.hand = cur.hand.filter(c => c.id !== cardId);
+    state.discardPile.push(card);
+    const meatCards: Card[] = [];
+    state.players.forEach((p, i) => {
+      if (i !== state.currentPlayerIndex) {
+        const meats = p.hand.filter((c): c is MaterialCard => c.type === "material" && c.materialType === "Et");
+        p.hand = p.hand.filter(c => !(c.type === "material" && (c as MaterialCard).materialType === "Et"));
+        meatCards.push(...meats);
+      }
+    });
+    cur.hand = [...cur.hand, ...meatCards];
+    addMessage(state, `🥩 ${cur.name} "${card.effectName}" kullandı! Tüm Et kartları toplandı (+${meatCards.length}).`, "event");
+    return {};
+  }
+
+  // refresh_orders — Mutfak Sürprizi
+  if (card.action === "refresh_orders") {
+    cur.hand = cur.hand.filter(c => c.id !== cardId);
+    state.discardPile.push(card);
+    // Put current market foods back at bottom of foodDeck and draw fresh ones
+    state.foodDeck = [...state.foodDeck, ...state.marketFoods];
+    state.marketFoods = [];
+    while (state.marketFoods.length < 3 && state.foodDeck.length > 0) {
+      state.marketFoods.push(state.foodDeck.shift()!);
+    }
+    addMessage(state, `🍳 ${cur.name} "${card.effectName}" kullandı! Sipariş penceresi yenilendi.`, "event");
+    return {};
+  }
+
+  // instant_points — Narenciye Hasadı
+  if (card.action === "instant_points") {
+    cur.hand = cur.hand.filter(c => c.id !== cardId);
+    state.discardPile.push(card);
+    const bonus = 5;
+    cur.points += bonus;
+    addMessage(state, `🍊 ${cur.name} "${card.effectName}" kullandı! +${bonus} puan kazandı.`, "event");
+    if (cur.points >= state.victoryPoints) {
+      state.phase = "game_over";
+      state.winnerIndex = state.currentPlayerIndex;
+      addMessage(state, `🏆 ${cur.name} kazandı! ${cur.points} puan!`, "success");
+    }
+    return {};
+  }
+
+  // multiply_lowest_points — Lezzet Rekabeti
+  if (card.action === "multiply_lowest_points") {
+    cur.hand = cur.hand.filter(c => c.id !== cardId);
+    state.discardPile.push(card);
+    const sorted = [...state.players].sort((a, b) => a.points - b.points);
+    const lowestScore = sorted[0].points;
+    let doubled = 0;
+    state.players.forEach(p => {
+      if (p.points === lowestScore) {
+        p.points = Math.min(p.points * 2, state.victoryPoints + 50);
+        doubled++;
+      }
+    });
+    addMessage(state, `🏅 ${cur.name} "${card.effectName}" kullandı! En düşük puanlı oyuncuların puanı iki katı oldu.`, "event");
+    // Check win
+    const winner = state.players.find(p => p.points >= state.victoryPoints);
+    if (winner) {
+      state.phase = "game_over";
+      state.winnerIndex = state.players.findIndex(p => p.socketId === winner.socketId);
+      addMessage(state, `🏆 ${winner.name} kazandı! ${winner.points} puan!`, "success");
+    }
+    return {};
+  }
+
+  // swap_all_cards — needs target player
+  if (card.action === "swap_all_cards") {
+    state.pendingEvent = card;
+    state.phase = "event_pending";
+    return { needsTarget: true };
+  }
+
+  // skip_turn, steal_card, trade_two
   if (card.action === "skip_turn" || card.action === "steal_card" || card.action === "trade_two") {
     state.pendingEvent = card;
     state.phase = "event_pending";
@@ -358,16 +435,16 @@ export function handleResolveEvent(room: Room, socketId: string, targetPlayerId?
   const card = state.pendingEvent;
 
   if (card.action === "multiply_points") {
-    if (!cardIds?.length) return "Bölge seçilmedi!";
-    const regionId = cardIds[0];
-    const region = state.marketRegions.find(r => r.id === regionId);
-    if (!region) return "Bölge bulunamadı!";
+    if (!cardIds?.length) return "Sipariş seçilmedi!";
+    const foodId = cardIds[0];
+    const food = state.marketFoods.find(f => f.id === foodId);
+    if (!food) return "Sipariş bulunamadı!";
     cur.hand = cur.hand.filter(c => c.id !== card.id);
     state.discardPile.push(card);
-    state.doubledMarketRegionId = regionId;
+    state.doubledMarketFoodId = foodId;
     state.pendingEvent = null;
     state.phase = "playing";
-    addMessage(state, `🧁 ${cur.name} "Künefe Şöleni" kullandı! ${region.name} - ${region.dish} kartı 2x puan!`, "event");
+    addMessage(state, `🧁 ${cur.name} "${card.effectName}" kullandı! ${food.emoji} ${food.name} kartı 2x puan!`, "event");
     return null;
   }
 
@@ -415,7 +492,22 @@ export function handleResolveEvent(room: Room, socketId: string, targetPlayerId?
     state.discardPile.push(card);
     state.pendingEvent = null;
     state.phase = "playing";
-    addMessage(state, `🏪 ${cur.name} "Esnaf Dayanışması" kullandı! ${target.name} ile 2 kart takas etti.`, "event");
+    addMessage(state, `🏪 ${cur.name} "${card.effectName}" kullandı! ${target.name} ile 2 kart takas etti.`, "event");
+    return null;
+  }
+
+  if (card.action === "swap_all_cards") {
+    if (targetPlayerId === undefined) return "Hedef seçilmedi!";
+    const target = state.players[targetPlayerId];
+    if (!target) return "Hedef bulunamadı!";
+    const curHandCopy = [...cur.hand.filter(c => c.id !== card.id)];
+    const targetHandCopy = [...target.hand];
+    cur.hand = targetHandCopy;
+    target.hand = curHandCopy;
+    state.discardPile.push(card);
+    state.pendingEvent = null;
+    state.phase = "playing";
+    addMessage(state, `🔄 ${cur.name} "${card.effectName}" kullandı! ${target.name} ile tüm elleri takas etti.`, "event");
     return null;
   }
 
@@ -432,8 +524,6 @@ export function handleEndTurn(room: Room, socketId: string): string | null {
   if (!state.hasDrawnThisTurn && !state.canEndTurn) return "Önce kart çekmelisin!";
 
   const numPlayers = state.players.length;
-
-  // Clear current player's block
   cur.blockedFromRegion = false;
 
   let nextIdx = (state.currentPlayerIndex + 1) % numPlayers;
@@ -466,17 +556,17 @@ export function buildPlayerView(room: Room, playerIndex: number) {
       name: p.name,
       cardCount: p.hand.length,
       points: p.points,
-      scoredRegions: p.scoredRegions,
+      scoredFoods: p.scoredFoods,
       skippedNextTurn: p.skippedNextTurn,
       blockedFromRegion: p.blockedFromRegion,
     })),
     myHand: me?.hand ?? [],
     currentPlayerIndex: state.currentPlayerIndex,
-    marketRegions: state.marketRegions,
+    marketFoods: state.marketFoods,
     drawDeckSize: state.drawDeck.length,
     discardPileSize: state.discardPile.length,
-    regionDeckSize: state.regionDeck.length,
-    doubledMarketRegionId: state.doubledMarketRegionId,
+    foodDeckSize: state.foodDeck.length,
+    doubledMarketFoodId: state.doubledMarketFoodId,
     messages: state.messages,
     winnerIndex: state.winnerIndex,
     hasDrawnThisTurn: isMyTurn ? state.hasDrawnThisTurn : false,

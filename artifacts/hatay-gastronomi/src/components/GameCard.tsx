@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { RegionCard, MaterialCard, EventCard, Card } from "../data/cards";
+import { FoodCard, MaterialCard, EventCard, Card } from "../data/cards";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -12,26 +12,25 @@ type Props = {
   className?: string;
 };
 
-function RegionCardView({ card, small }: { card: RegionCard; small?: boolean }) {
+function FoodCardView({ card, small }: { card: FoodCard; small?: boolean }) {
   return (
     <div className={cn("flex flex-col h-full justify-between", small ? "gap-0.5" : "gap-1")}>
       <div className={cn("text-center", small ? "text-2xl" : "text-4xl")}>{card.emoji}</div>
       <div>
-        <div className={cn("font-bold text-white text-center leading-tight", small ? "text-xs" : "text-sm")}>{card.name}</div>
-        <div className={cn("text-white/80 text-center italic", small ? "text-[9px]" : "text-xs")}>{card.dish}</div>
+        <div className={cn("font-bold text-white text-center leading-tight", small ? "text-[9px]" : "text-sm")}>{card.name}</div>
       </div>
       <div className="flex flex-wrap gap-0.5 justify-center">
         {card.requiredMaterials.map((m, i) => (
           <span
             key={i}
-            className={cn("bg-white/20 text-white rounded px-1 font-medium", small ? "text-[8px]" : "text-[10px]")}
+            className={cn("bg-white/20 text-white rounded px-1 font-medium", small ? "text-[7px]" : "text-[10px]")}
           >
             {m}
           </span>
         ))}
       </div>
       <div className="flex justify-between items-center">
-        <span className={cn("text-white/70", small ? "text-[9px]" : "text-xs")}>Bölge</span>
+        <span className={cn("text-white/70", small ? "text-[8px]" : "text-xs")}>Sipariş</span>
         <span className={cn("font-bold text-yellow-300", small ? "text-xs" : "text-base")}>
           ⭐ {card.points}
         </span>
@@ -52,7 +51,7 @@ function MaterialCardView({ card, small }: { card: MaterialCard; small?: boolean
         )}
       </div>
       <div className={cn("text-white/70 text-center leading-tight", small ? "text-[8px]" : "text-[10px]")}>
-        {card.name.split("(")[0].trim()}
+        {card.name}
       </div>
       <div>
         <span className={cn("text-white/50", small ? "text-[8px]" : "text-[10px]")}>Malzeme</span>
@@ -80,8 +79,8 @@ function EventCardView({ card, small }: { card: EventCard; small?: boolean }) {
 
 export function GameCard({ card, selected, onClick, faceDown, small, disabled, className }: Props) {
   const gradientClass =
-    card.type === "region"
-      ? (card as RegionCard).color
+    card.type === "food"
+      ? (card as FoodCard).color
       : card.type === "material"
       ? (card as MaterialCard).color
       : (card as EventCard).color;
@@ -114,14 +113,14 @@ export function GameCard({ card, selected, onClick, faceDown, small, disabled, c
           <span className="text-3xl">🎴</span>
         </div>
       ) : (
-        <RegionOrMaterialOrEvent card={card} small={small} />
+        <CardContent card={card} small={small} />
       )}
     </motion.div>
   );
 }
 
-function RegionOrMaterialOrEvent({ card, small }: { card: Card; small?: boolean }) {
-  if (card.type === "region") return <RegionCardView card={card as RegionCard} small={small} />;
+function CardContent({ card, small }: { card: Card; small?: boolean }) {
+  if (card.type === "food") return <FoodCardView card={card as FoodCard} small={small} />;
   if (card.type === "material") return <MaterialCardView card={card as MaterialCard} small={small} />;
   return <EventCardView card={card as EventCard} small={small} />;
 }

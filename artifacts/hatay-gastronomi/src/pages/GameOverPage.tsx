@@ -53,7 +53,7 @@ export function GameOverPage({ onBack }: Props) {
                 <div className="text-left">
                   <div className="text-white font-medium">{player.name}</div>
                   <div className="text-white/50 text-xs">
-                    {player.scoredRegions.length} bölge tamamlandı
+                    {player.scoredFoods.length} sipariş tamamlandı
                   </div>
                 </div>
               </div>
