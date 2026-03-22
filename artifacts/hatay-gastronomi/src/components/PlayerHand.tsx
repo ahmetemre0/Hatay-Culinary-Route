@@ -1,8 +1,23 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { GameCard } from "./GameCard";
 import { useGameStore } from "../store/gameStore";
-import { Card, EventCard, MaterialCard, MaterialType } from "../data/cards";
+import { Card, MaterialCard, MaterialType } from "../data/cards";
 import { cn } from "@/lib/utils";
+
+function getCompletableCardIds(hand: Card[], required: MaterialType[]): string[] | null {
+  const mats = hand.filter((c): c is MaterialCard => c.type === "material");
+  const req = [...required];
+  const used: MaterialCard[] = [];
+  const pool = [...mats];
+  for (const r of req) {
+    const exact = pool.findIndex((m) => m.materialType === r);
+    if (exact !== -1) { used.push(pool[exact]); pool.splice(exact, 1); continue; }
+    const joker = pool.findIndex((m) => m.materialType === "Joker");
+    if (joker !== -1) { used.push(pool[joker]); pool.splice(joker, 1); continue; }
+    return null;
+  }
+  return used.map((c) => c.id);
+}
 
 export function PlayerHand() {
   const {
@@ -21,9 +36,11 @@ export function PlayerHand() {
   const current = players[currentPlayerIndex];
   if (!current) return null;
 
-  const neededMaterials = new Set<MaterialType>(
-    marketFoods.flatMap((f) => f.requiredMaterials)
-  );
+  const completableIds = new Set<string>();
+  for (const food of marketFoods) {
+    const ids = getCompletableCardIds(current.hand, food.requiredMaterials);
+    if (ids) ids.forEach((id) => completableIds.add(id));
+  }
 
   const handleCardClick = (card: Card) => {
     if (phase !== "playing") return;
@@ -70,8 +87,7 @@ export function PlayerHand() {
           {current.hand.map((card, idx) => {
             const isSelected = selectedCards.includes(card.id);
             const isEvent = card.type === "event";
-            const isMaterial = card.type === "material";
-            const isNeeded = isMaterial && neededMaterials.has((card as MaterialCard).materialType);
+            const isCompletable = completableIds.has(card.id);
             return (
               <motion.div
                 key={card.id}
@@ -92,9 +108,9 @@ export function PlayerHand() {
                     ⚡
                   </span>
                 )}
-                {isNeeded && !isSelected && (
-                  <span className="absolute -top-1 -left-1 bg-orange-400 text-black text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center shadow">
-                    🍽️
+                {isCompletable && !isSelected && (
+                  <span className="absolute -top-1 -left-1 bg-green-400 text-black text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center shadow">
+                    ✓
                   </span>
                 )}
               </motion.div>

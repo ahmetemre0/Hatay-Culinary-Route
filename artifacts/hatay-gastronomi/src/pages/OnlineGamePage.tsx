@@ -417,9 +417,22 @@ function OnlinePlayerHand() {
   const isMyTurn = myPlayerIndex === currentPlayerIndex;
   const canAct = onlinePhase === "playing" && isMyTurn;
 
-  const neededMaterials = new Set<MaterialType>(
-    marketFoods.flatMap((f) => f.requiredMaterials)
-  );
+  const completableIds = new Set<string>();
+  for (const food of marketFoods) {
+    const mats = myHand.filter((c): c is MaterialCard => c.type === "material");
+    const req = [...food.requiredMaterials];
+    const used: MaterialCard[] = [];
+    const pool = [...mats];
+    let ok = true;
+    for (const r of req) {
+      const exact = pool.findIndex((m) => m.materialType === r);
+      if (exact !== -1) { used.push(pool[exact]); pool.splice(exact, 1); continue; }
+      const joker = pool.findIndex((m) => m.materialType === "Joker");
+      if (joker !== -1) { used.push(pool[joker]); pool.splice(joker, 1); continue; }
+      ok = false; break;
+    }
+    if (ok) used.forEach((c) => completableIds.add(c.id));
+  }
 
   const handleCardClick = (card: Card) => {
     if (!canAct) return;
@@ -469,8 +482,7 @@ function OnlinePlayerHand() {
           {myHand.map((card, idx) => {
             const isSelected = selectedCards.includes(card.id);
             const isEvent = card.type === "event";
-            const isMaterial = card.type === "material";
-            const isNeeded = isMaterial && neededMaterials.has((card as MaterialCard).materialType);
+            const isCompletable = completableIds.has(card.id);
             return (
               <motion.div
                 key={card.id}
@@ -491,9 +503,9 @@ function OnlinePlayerHand() {
                     ⚡
                   </span>
                 )}
-                {isNeeded && !isSelected && (
-                  <span className="absolute -top-1 -left-1 bg-orange-400 text-black text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center shadow">
-                    🍽️
+                {isCompletable && !isSelected && (
+                  <span className="absolute -top-1 -left-1 bg-green-400 text-black text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center shadow">
+                    ✓
                   </span>
                 )}
               </motion.div>
