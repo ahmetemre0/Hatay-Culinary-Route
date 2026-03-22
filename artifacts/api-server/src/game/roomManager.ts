@@ -419,13 +419,19 @@ export function handleUseEventCard(room: Room, socketId: string, cardId: string)
   if (card.action === "multiply_lowest_points") {
     cur.hand = cur.hand.filter(c => c.id !== cardId);
     state.discardPile.push(card);
-    const lowestFood = [...state.marketFoods].sort((a, b) => a.points - b.points)[0];
+    const lowestFood = [...cur.scoredFoods].sort((a, b) => a.points - b.points)[0];
     if (!lowestFood) {
-      addMessage(state, `🏡 ${cur.name} "${card.effectName}" kullandı ama sipariş penceresinde yemek yok!`, "warning");
+      addMessage(state, `🏡 ${cur.name} "${card.effectName}" kullandı ama tamamlanmış siparişi yok! Kart çöpe gitti.`, "warning");
       return {};
     }
-    state.doubledMarketFoodId = lowestFood.id;
-    addMessage(state, `🏡 ${cur.name} "${card.effectName}" kullandı! "${lowestFood.name}" (${lowestFood.points} puan) 2x'e yükseltildi!`, "event");
+    const bonus = lowestFood.points;
+    cur.points += bonus;
+    addMessage(state, `🏡 ${cur.name} "${card.effectName}" kullandı! "${lowestFood.name}" (${lowestFood.points} puan) ikiye katlandı → +${bonus} puan!`, "event");
+    if (cur.points >= state.victoryPoints) {
+      state.phase = "game_over";
+      state.winnerIndex = state.currentPlayerIndex;
+      addMessage(state, `🏆 ${cur.name} kazandı! ${cur.points} puan!`, "success");
+    }
     return {};
   }
 

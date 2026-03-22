@@ -381,18 +381,24 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     if (card.action === "multiply_lowest_points") {
-      const lowestFood = [...state.marketFoods].sort((a, b) => a.points - b.points)[0];
       const newHand = cur.hand.filter((c) => c.id !== cardId);
-      const players = state.players.map((p, i) =>
-        i === state.currentPlayerIndex ? { ...p, hand: newHand } : p
+      const players = (bonus: number) => state.players.map((p, i) =>
+        i === state.currentPlayerIndex ? { ...p, hand: newHand, points: p.points + bonus } : p
       );
+      const lowestFood = [...cur.scoredFoods].sort((a, b) => a.points - b.points)[0];
       if (!lowestFood) {
-        const r = addLog(state.logs, state.logIdCounter, "Sipariş penceresinde yemek yok!", "warning");
-        set({ players, logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] });
+        const r = addLog(state.logs, state.logIdCounter, "Tamamlanmış siparişin yok! Kart çöpe gitti.", "warning");
+        set({ players: players(0), logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] });
         return;
       }
-      const r = addLog(state.logs, state.logIdCounter, `🏡 ${cur.name} "Memleket Hasreti" kullandı! "${lowestFood.name}" (${lowestFood.points} puan) 2x'e yükseltildi!`, "event");
-      set({ players, doubledMarketFoodId: lowestFood.id, logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] });
+      const bonus = lowestFood.points;
+      const r = addLog(state.logs, state.logIdCounter, `🏡 ${cur.name} "Memleket Hasreti" kullandı! "${lowestFood.name}" (${bonus} puan) ikiye katlandı → +${bonus} puan!`, "event");
+      const newState: Partial<GameState> = { players: players(bonus), logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] };
+      if (cur.points + bonus >= state.victoryPoints) {
+        newState.phase = "game_over";
+        newState.winnerIndex = state.currentPlayerIndex;
+      }
+      set(newState);
       return;
     }
 
