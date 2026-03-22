@@ -246,7 +246,24 @@ export function handleDrawCard(room: Room, socketId: string): string | null {
   return null;
 }
 
-export function handleTryComplete(room: Room, socketId: string, foodId: string): string | null {
+function checkSelectedMaterials(hand: Card[], selectedIds: string[], required: MaterialType[]): boolean {
+  const selectedMats = hand.filter(
+    (c): c is MaterialCard => c.type === "material" && selectedIds.includes(c.id)
+  );
+  if (selectedMats.length !== required.length) return false;
+  const req = [...required];
+  const mats = [...selectedMats];
+  for (const r of req) {
+    const exact = mats.findIndex(m => m.materialType === r);
+    if (exact !== -1) { mats.splice(exact, 1); continue; }
+    const joker = mats.findIndex(m => m.materialType === "Joker");
+    if (joker !== -1) { mats.splice(joker, 1); continue; }
+    return false;
+  }
+  return true;
+}
+
+export function handleTryComplete(room: Room, socketId: string, foodId: string, selectedCards?: string[]): string | null {
   const state = room.state;
   if (state.phase !== "playing") return "Yanlış aşama!";
   const cur = state.players[state.currentPlayerIndex];
@@ -255,9 +272,15 @@ export function handleTryComplete(room: Room, socketId: string, foodId: string):
 
   const food = state.marketFoods.find(f => f.id === foodId);
   if (!food) return "Sipariş bulunamadı!";
-  if (!checkMaterials(cur.hand, food.requiredMaterials)) return `Yeterli malzemen yok! (${food.requiredMaterials.join(", ")})`;
 
-  cur.hand = consumeMaterials(cur.hand, food.requiredMaterials);
+  if (!selectedCards || selectedCards.length === 0) {
+    return `Önce gerekli malzemeleri seç! Gereken: ${food.requiredMaterials.join(", ")}`;
+  }
+  if (!checkSelectedMaterials(cur.hand, selectedCards, food.requiredMaterials)) {
+    return `Seçilen malzemeler tarife uymuyor! Gereken: ${food.requiredMaterials.join(", ")}`;
+  }
+
+  cur.hand = cur.hand.filter(c => !selectedCards.includes(c.id));
   state.marketFoods = state.marketFoods.filter(f => f.id !== foodId);
   if (state.foodDeck.length > 0) state.marketFoods.push(state.foodDeck.shift()!);
 
@@ -300,23 +323,30 @@ export function handleUseEventCard(room: Room, socketId: string, cardId: string)
     return {};
   }
 
-  // reshuffle_all — Asi Nehri Taştı: each player draws N extra cards = their current hand size
+  // reshuffle_all — Asi Nehri Taştı: all cards from all hands are pooled + reshuffled, each draws N new
   if (card.action === "reshuffle_all") {
-    cur.hand = cur.hand.filter(c => c.id !== cardId);
-    state.discardPile.push(card);
-    // Refill draw deck if needed
-    if (state.drawDeck.length < 20 && state.discardPile.length > 0) {
-      const recycled = shuffle([...state.discardPile]);
-      state.drawDeck = [...state.drawDeck, ...recycled];
-      state.discardPile = [];
-    }
+    // Record hand sizes before clearing
+    const handSizes = state.players.map(p =>
+      p.socketId === cur.socketId ? p.hand.filter(c => c.id !== cardId).length : p.hand.length
+    );
+    // Pool all cards from all hands + draw deck
+    let pool: Card[] = [...state.drawDeck];
     state.players.forEach(p => {
-      const extraCount = p.hand.length;
-      const drawn: Card[] = [];
-      for (let i = 0; i < extraCount && state.drawDeck.length > 0; i++) drawn.push(state.drawDeck.shift()!);
-      p.hand = [...p.hand, ...drawn];
+      if (p.socketId === cur.socketId) pool.push(...p.hand.filter(c => c.id !== cardId));
+      else pool.push(...p.hand);
+      p.hand = [];
     });
-    addMessage(state, `🌊 ${cur.name} "${card.effectName}" kullandı! Herkes elindeki kadar ekstra kart çekti.`, "event");
+    pool = shuffle(pool);
+    // Each player draws N new cards (N = original hand size)
+    let poolIdx = 0;
+    state.players.forEach((p, i) => {
+      const drawn: Card[] = [];
+      for (let j = 0; j < handSizes[i] && poolIdx < pool.length; j++) drawn.push(pool[poolIdx++]);
+      p.hand = drawn;
+    });
+    state.drawDeck = pool.slice(poolIdx);
+    state.discardPile.push(card);
+    addMessage(state, `🌊 ${cur.name} "${card.effectName}" kullandı! Herkes elini bıraktı ve aynı sayıda yeni kart çekti.`, "event");
     return {};
   }
 
@@ -500,10 +530,10 @@ export function handleResolveEvent(room: Room, socketId: string, targetPlayerId?
     if (targetPlayerId === undefined) return "Hedef seçilmedi!";
     const target = state.players[targetPlayerId];
     if (!target) return "Hedef bulunamadı!";
-    const curHandCopy = [...cur.hand.filter(c => c.id !== card.id)];
+    const curHandWithout = cur.hand.filter(c => c.id !== card.id);
     const targetHandCopy = [...target.hand];
     cur.hand = targetHandCopy;
-    target.hand = curHandCopy;
+    target.hand = curHandWithout;
     state.discardPile.push(card);
     state.pendingEvent = null;
     state.phase = "playing";

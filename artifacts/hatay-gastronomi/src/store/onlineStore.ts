@@ -264,7 +264,11 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     set({ selectedCards: selected });
   },
 
-  tryComplete: (foodId) => { get().socket?.emit("try_complete", { regionId: foodId }); },
+  tryComplete: (foodId) => {
+    const { socket, selectedCards } = get();
+    socket?.emit("try_complete", { regionId: foodId, selectedCards });
+    set({ selectedCards: [] });
+  },
 
   useEventCard: (cardId) => { get().socket?.emit("use_event_card", { cardId }); },
 

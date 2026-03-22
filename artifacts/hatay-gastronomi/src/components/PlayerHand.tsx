@@ -86,7 +86,7 @@ export function PlayerHand() {
 
       {selectedCards.length > 0 && (
         <div className="mt-2 text-center text-yellow-300 text-xs">
-          {selectedCards.length} kart seçildi — üstteki bölge kartına tıkla!
+          {selectedCards.length} malzeme seçildi — şimdi sipariş kartına tıkla!
         </div>
       )}
     </div>

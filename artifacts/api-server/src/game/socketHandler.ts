@@ -54,10 +54,10 @@ export function setupSocketHandler(io: Server) {
       emitAll(io, room);
     });
 
-    socket.on("try_complete", ({ regionId }: { regionId: string }) => {
+    socket.on("try_complete", ({ regionId, selectedCards }: { regionId: string; selectedCards?: string[] }) => {
       const room = getRoomBySocket(socket.id);
       if (!room) return;
-      const err = handleTryComplete(room, socket.id, regionId);
+      const err = handleTryComplete(room, socket.id, regionId, selectedCards);
       if (err) { socket.emit("error_msg", { message: err }); return; }
       // send animation to all
       emitAll(io, room);

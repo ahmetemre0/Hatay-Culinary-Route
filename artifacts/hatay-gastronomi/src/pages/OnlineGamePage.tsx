@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useOnlineStore } from "../store/onlineStore";
 import { GameCard } from "../components/GameCard";
 import { cn } from "@/lib/utils";
-import { Card, EventCard, MaterialCard, FoodCard } from "../data/cards";
+import { Card, EventCard, MaterialCard, FoodCard, MaterialType } from "../data/cards";
 
 function ActionFeed() {
   const messages = useOnlineStore((s) => s.messages);
@@ -272,6 +272,28 @@ function OtherPlayersArea() {
   );
 }
 
+function selectionMatchesFood(
+  hand: Card[],
+  selectedIds: string[],
+  required: MaterialType[]
+): "match" | "mismatch" | "none" {
+  if (selectedIds.length === 0) return "none";
+  const selectedMats = hand.filter(
+    (c): c is MaterialCard => c.type === "material" && selectedIds.includes(c.id)
+  );
+  if (selectedMats.length !== required.length) return "mismatch";
+  const req = [...required];
+  const mats = [...selectedMats];
+  for (const r of req) {
+    const exact = mats.findIndex((m) => m.materialType === r);
+    if (exact !== -1) { mats.splice(exact, 1); continue; }
+    const joker = mats.findIndex((m) => m.materialType === "Joker");
+    if (joker !== -1) { mats.splice(joker, 1); continue; }
+    return "mismatch";
+  }
+  return "match";
+}
+
 function OnlineMarketArea() {
   const {
     marketFoods,
@@ -285,6 +307,8 @@ function OnlineMarketArea() {
     doubledMarketFoodId,
     myPlayerIndex,
     currentPlayerIndex,
+    myHand,
+    selectedCards,
   } = useOnlineStore();
 
   const isMyTurn = myPlayerIndex === currentPlayerIndex;
@@ -326,6 +350,7 @@ function OnlineMarketArea() {
               {marketFoods.map((food) => {
                 const isDoubled = doubledMarketFoodId === food.id;
                 const isAnimating = cookingAnimation === food.id;
+                const matchState = canAct ? selectionMatchesFood(myHand, selectedCards, food.requiredMaterials) : "none";
                 return (
                   <motion.div
                     key={food.id}
@@ -339,6 +364,11 @@ function OnlineMarketArea() {
                         2x Puan!
                       </div>
                     )}
+                    {matchState === "match" && !isDoubled && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-green-400 text-black text-[10px] font-bold rounded-full px-2 py-0.5 z-10 whitespace-nowrap animate-pulse">
+                        ✓ Yap!
+                      </div>
+                    )}
                     <motion.div
                       animate={isAnimating ? { scale: [1, 1.15, 1], rotate: [0, -3, 3, 0] } : {}}
                       transition={{ duration: 0.5 }}
@@ -347,7 +377,11 @@ function OnlineMarketArea() {
                         card={food}
                         onClick={canAct ? () => tryComplete(food.id) : undefined}
                         disabled={!canAct}
-                        className={cn(isDoubled && "ring-2 ring-amber-400")}
+                        className={cn(
+                          isDoubled && "ring-2 ring-amber-400",
+                          matchState === "match" && "ring-2 ring-green-400",
+                          matchState === "mismatch" && "opacity-50"
+                        )}
                       />
                     </motion.div>
                   </motion.div>
@@ -445,7 +479,7 @@ function OnlinePlayerHand() {
 
       {selectedCards.length > 0 && (
         <div className="mt-2 text-center text-yellow-300 text-xs">
-          {selectedCards.length} kart seçildi — sipariş kartına tıkla!
+          {selectedCards.length} malzeme seçildi — şimdi sipariş kartına tıkla!
         </div>
       )}
     </div>

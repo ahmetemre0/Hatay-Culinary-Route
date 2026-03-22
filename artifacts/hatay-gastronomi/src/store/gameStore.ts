@@ -107,6 +107,23 @@ function consumeMaterials(hand: Card[], required: MaterialType[]): Card[] {
   return remaining;
 }
 
+function checkSelectedMaterials(hand: Card[], selectedIds: string[], required: MaterialType[]): boolean {
+  const selectedMats = hand.filter(
+    (c): c is MaterialCard => c.type === "material" && selectedIds.includes(c.id)
+  );
+  if (selectedMats.length !== required.length) return false;
+  const req = [...required];
+  const mats = [...selectedMats];
+  for (const r of req) {
+    const exact = mats.findIndex((m) => m.materialType === r);
+    if (exact !== -1) { mats.splice(exact, 1); continue; }
+    const joker = mats.findIndex((m) => m.materialType === "Joker");
+    if (joker !== -1) { mats.splice(joker, 1); continue; }
+    return false;
+  }
+  return true;
+}
+
 export const useGameStore = create<GameState>((set, get) => ({
   phase: "setup",
   players: [],
@@ -212,13 +229,19 @@ export const useGameStore = create<GameState>((set, get) => ({
     const food = state.marketFoods.find((f) => f.id === foodId);
     if (!food) return;
 
-    if (!checkMaterials(cur.hand, food.requiredMaterials)) {
-      const r = addLog(state.logs, state.logIdCounter, `Yeterli malzemen yok! (${food.requiredMaterials.join(", ")})`, "warning");
+    if (state.selectedCards.length === 0) {
+      const r = addLog(state.logs, state.logIdCounter, `Önce gerekli malzemeleri seç! Gereken: ${food.requiredMaterials.join(", ")}`, "warning");
       set({ logs: r.logs, logIdCounter: r.counter });
       return;
     }
 
-    const newHand = consumeMaterials(cur.hand, food.requiredMaterials);
+    if (!checkSelectedMaterials(cur.hand, state.selectedCards, food.requiredMaterials)) {
+      const r = addLog(state.logs, state.logIdCounter, `Seçilen malzemeler tarife uymuyor! Gereken: ${food.requiredMaterials.join(", ")}`, "warning");
+      set({ logs: r.logs, logIdCounter: r.counter });
+      return;
+    }
+
+    const newHand = cur.hand.filter((c) => !state.selectedCards.includes(c.id));
     const newMarket = state.marketFoods.filter((f) => f.id !== foodId);
     let newFoodDeck = [...state.foodDeck];
     if (newFoodDeck.length > 0) newMarket.push(newFoodDeck.shift()!);
@@ -280,17 +303,27 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     if (card.action === "reshuffle_all") {
-      // Yeni Asi Nehri Taştı: herkes elindeki kart sayısı kadar ek kart çeker
-      let deck = [...state.drawDeck];
-      const newPlayers = state.players.map((p) => {
-        const count = p.id === cur.id ? p.hand.filter((c) => c.id !== cardId).length : p.hand.length;
-        const drawn: Card[] = [];
-        for (let i = 0; i < count && deck.length > 0; i++) drawn.push(deck.shift()!);
-        if (p.id === cur.id) return { ...p, hand: [...p.hand.filter((c) => c.id !== cardId), ...drawn] };
-        return { ...p, hand: [...p.hand, ...drawn] };
+      // Her oyuncunun mevcut el büyüklüğü kaydedilir
+      const handSizes = state.players.map((p) =>
+        p.id === cur.id ? p.hand.filter((c) => c.id !== cardId).length : p.hand.length
+      );
+      // Tüm ellerden kartlar + mevcut deste birleştirilip karıştırılır
+      let pool: Card[] = [...state.drawDeck];
+      state.players.forEach((p) => {
+        if (p.id === cur.id) pool.push(...p.hand.filter((c) => c.id !== cardId));
+        else pool.push(...p.hand);
       });
-      const r = addLog(state.logs, state.logIdCounter, `🌊 ${cur.name} "Asi Nehri Taştı" kullandı! Herkes ek kart çekti.`, "event");
-      set({ players: newPlayers, drawDeck: deck, discardPile: [...state.discardPile, card], logs: r.logs, logIdCounter: r.counter });
+      pool = shuffle(pool);
+      // Her oyuncu elini sıfırlar ve N yeni kart çeker
+      let poolIdx = 0;
+      const newPlayers = state.players.map((p, i) => {
+        const drawn: Card[] = [];
+        for (let j = 0; j < handSizes[i] && poolIdx < pool.length; j++) drawn.push(pool[poolIdx++]);
+        return { ...p, hand: drawn };
+      });
+      const newDeck = pool.slice(poolIdx);
+      const r = addLog(state.logs, state.logIdCounter, `🌊 ${cur.name} "Asi Nehri Taştı" kullandı! Herkes elini bıraktı ve aynı sayıda yeni kart çekti.`, "event");
+      set({ players: newPlayers, drawDeck: newDeck, discardPile: [...state.discardPile, card], logs: r.logs, logIdCounter: r.counter });
       return;
     }
 
@@ -461,8 +494,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (targetPlayerId === undefined) return;
       const targetPlayer = state.players.find((p) => p.id === targetPlayerId)!;
       const myHandWithout = cur.hand.filter((c) => c.id !== card.id);
+      const targetHandCopy = [...targetPlayer.hand];
       const players = state.players.map((p) => {
-        if (p.id === cur.id) return { ...p, hand: [...targetPlayer.hand, ...myHandWithout.filter((c) => c.id !== card.id)] };
+        if (p.id === cur.id) return { ...p, hand: targetHandCopy };
         if (p.id === targetPlayerId) return { ...p, hand: myHandWithout };
         return p;
       });
