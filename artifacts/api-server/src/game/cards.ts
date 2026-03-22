@@ -84,7 +84,7 @@ const EVENT_TEMPLATES: Omit<EventCard, "id" | "type">[] = [
   { effectName: "Esnaf Dayanışması", description: "Bir oyuncunun rastgele 2 kartıyla kendi 2 kartını takas et.", action: "trade_two", emoji: "🏪", color: "from-yellow-500 to-yellow-700" },
   { effectName: "Sıcak Hava Dalgası", description: "Sen hariç tüm oyuncular bir sonraki tur sipariş tamamlayamaz.", action: "block_region", emoji: "☀️", color: "from-orange-400 to-yellow-500" },
   { effectName: "Saray Caddesine Taşındık", description: "Sipariş penceresindeki bir yemeğin puanını 2 ile çarp!", action: "multiply_points", emoji: "🏰", color: "from-amber-400 to-amber-600" },
-  { effectName: "Memleket Hasreti", description: "En düşük puanlı yaptığın yemeğin puanını ikiye katla.", action: "multiply_lowest_points", emoji: "🏡", color: "from-sky-500 to-blue-700" },
+  { effectName: "Memleket Hasreti", description: "Sipariş penceresindeki en düşük puanlı yemeği otomatik 2x'e yükseltir.", action: "multiply_lowest_points", emoji: "🏡", color: "from-sky-500 to-blue-700" },
   { effectName: "Etobur", description: "Herkes elindeki Et kartlarını sana verir.", action: "collect_all_meat", emoji: "🥩", color: "from-red-500 to-red-700" },
   { effectName: "Araktini Kafa Yaptı", description: "Sipariş penceresi tamamen yenilenir.", action: "refresh_orders", emoji: "🍾", color: "from-indigo-500 to-violet-700" },
   { effectName: "Yaruhe Kalbek", description: "Annen sana en sevdiğin yemeği yaptı. 3 puan kazan!", action: "instant_points", emoji: "💝", color: "from-pink-500 to-rose-700" },

@@ -400,11 +400,11 @@ export function handleUseEventCard(room: Room, socketId: string, cardId: string)
     return {};
   }
 
-  // instant_points — Narenciye Hasadı
+  // instant_points — Yaruhe Kalbek
   if (card.action === "instant_points") {
     cur.hand = cur.hand.filter(c => c.id !== cardId);
     state.discardPile.push(card);
-    const bonus = 5;
+    const bonus = 3;
     cur.points += bonus;
     addMessage(state, `🍊 ${cur.name} "${card.effectName}" kullandı! +${bonus} puan kazandı.`, "event");
     if (cur.points >= state.victoryPoints) {
@@ -415,27 +415,17 @@ export function handleUseEventCard(room: Room, socketId: string, cardId: string)
     return {};
   }
 
-  // multiply_lowest_points — Lezzet Rekabeti
+  // multiply_lowest_points — Memleket Hasreti
   if (card.action === "multiply_lowest_points") {
     cur.hand = cur.hand.filter(c => c.id !== cardId);
     state.discardPile.push(card);
-    const sorted = [...state.players].sort((a, b) => a.points - b.points);
-    const lowestScore = sorted[0].points;
-    let doubled = 0;
-    state.players.forEach(p => {
-      if (p.points === lowestScore) {
-        p.points = Math.min(p.points * 2, state.victoryPoints + 50);
-        doubled++;
-      }
-    });
-    addMessage(state, `🏅 ${cur.name} "${card.effectName}" kullandı! En düşük puanlı oyuncuların puanı iki katı oldu.`, "event");
-    // Check win
-    const winner = state.players.find(p => p.points >= state.victoryPoints);
-    if (winner) {
-      state.phase = "game_over";
-      state.winnerIndex = state.players.findIndex(p => p.socketId === winner.socketId);
-      addMessage(state, `🏆 ${winner.name} kazandı! ${winner.points} puan!`, "success");
+    const lowestFood = [...state.marketFoods].sort((a, b) => a.points - b.points)[0];
+    if (!lowestFood) {
+      addMessage(state, `🏡 ${cur.name} "${card.effectName}" kullandı ama sipariş penceresinde yemek yok!`, "warning");
+      return {};
     }
+    state.doubledMarketFoodId = lowestFood.id;
+    addMessage(state, `🏡 ${cur.name} "${card.effectName}" kullandı! "${lowestFood.name}" (${lowestFood.points} puan) 2x'e yükseltildi!`, "event");
     return {};
   }
 

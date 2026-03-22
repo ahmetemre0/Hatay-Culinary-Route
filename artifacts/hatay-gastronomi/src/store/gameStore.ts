@@ -381,24 +381,18 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     if (card.action === "multiply_lowest_points") {
-      const lowestFood = [...cur.scoredFoods].sort((a, b) => a.points - b.points)[0];
-      if (!lowestFood) {
-        const r = addLog(state.logs, state.logIdCounter, "Tamamlanmış siparişin yok!", "warning");
-        set({ logs: r.logs, logIdCounter: r.counter });
-        return;
-      }
-      const bonus = lowestFood.points;
+      const lowestFood = [...state.marketFoods].sort((a, b) => a.points - b.points)[0];
       const newHand = cur.hand.filter((c) => c.id !== cardId);
       const players = state.players.map((p, i) =>
-        i === state.currentPlayerIndex ? { ...p, hand: newHand, points: p.points + bonus } : p
+        i === state.currentPlayerIndex ? { ...p, hand: newHand } : p
       );
-      const r = addLog(state.logs, state.logIdCounter, `🏡 ${cur.name} "Memleket Hasreti" kullandı! "${lowestFood.name}" puanı 2x → +${bonus} puan.`, "event");
-      const newState: Partial<GameState> = { players, logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] };
-      if (cur.points + bonus >= state.victoryPoints) {
-        newState.phase = "game_over";
-        newState.winnerIndex = state.currentPlayerIndex;
+      if (!lowestFood) {
+        const r = addLog(state.logs, state.logIdCounter, "Sipariş penceresinde yemek yok!", "warning");
+        set({ players, logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] });
+        return;
       }
-      set(newState);
+      const r = addLog(state.logs, state.logIdCounter, `🏡 ${cur.name} "Memleket Hasreti" kullandı! "${lowestFood.name}" (${lowestFood.points} puan) 2x'e yükseltildi!`, "event");
+      set({ players, doubledMarketFoodId: lowestFood.id, logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] });
       return;
     }
 

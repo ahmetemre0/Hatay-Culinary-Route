@@ -5,18 +5,12 @@ import { Scoreboard } from "../components/Scoreboard";
 import { GameLog } from "../components/GameLog";
 import { EventModal } from "../components/EventModal";
 import { useGameStore } from "../store/gameStore";
-import { cn } from "@/lib/utils";
-
 export function GamePage() {
   const {
     players,
     currentPlayerIndex,
-    endTurn,
     resetGame,
-    hasDrawnThisTurn,
-    canEndTurn,
     drawDeck,
-    phase,
   } = useGameStore();
 
   const current = players[currentPlayerIndex];
@@ -35,19 +29,6 @@ export function GamePage() {
         </div>
 
         <div className="flex gap-2">
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={endTurn}
-            disabled={!canEndTurn && !hasDrawnThisTurn}
-            className={cn(
-              "px-4 py-2 rounded-xl text-sm font-bold transition-all",
-              hasDrawnThisTurn
-                ? "bg-amber-500 text-black hover:bg-amber-400"
-                : "bg-white/10 text-white/40 cursor-not-allowed"
-            )}
-          >
-            Sırayı Bitir →
-          </motion.button>
           <motion.button
             whileTap={{ scale: 0.95 }}
             onClick={resetGame}

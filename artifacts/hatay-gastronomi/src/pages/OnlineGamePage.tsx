@@ -410,10 +410,16 @@ function OnlinePlayerHand() {
     hasDrawnThisTurn,
     myPlayerIndex,
     currentPlayerIndex,
+    endTurn,
+    marketFoods,
   } = useOnlineStore();
 
   const isMyTurn = myPlayerIndex === currentPlayerIndex;
   const canAct = onlinePhase === "playing" && isMyTurn;
+
+  const neededMaterials = new Set<MaterialType>(
+    marketFoods.flatMap((f) => f.requiredMaterials)
+  );
 
   const handleCardClick = (card: Card) => {
     if (!canAct) return;
@@ -430,13 +436,30 @@ function OnlinePlayerHand() {
         <h3 className="text-white font-semibold text-sm">
           🃏 Elin ({myHand.length} kart)
         </h3>
-        <div className="text-xs text-white/50">
-          {!isMyTurn && <span className="text-white/30">Sıranı bekle...</span>}
-          {isMyTurn && myHand.some((c) => c.type === "event") && (
-            <span className="text-yellow-300">⚡ Olay kartına tıkla → hemen kullan</span>
-          )}
-          {isMyTurn && !hasDrawnThisTurn && myHand.some((c) => c.type === "material") && (
-            <span className="text-blue-300 ml-2">Önce kart çek 👆</span>
+        <div className="flex items-center gap-2">
+          <div className="text-xs text-white/50">
+            {!isMyTurn && <span className="text-white/30">Sıranı bekle...</span>}
+            {isMyTurn && myHand.some((c) => c.type === "event") && (
+              <span className="text-yellow-300">⚡ Olay kartına tıkla → hemen kullan</span>
+            )}
+            {isMyTurn && !hasDrawnThisTurn && myHand.some((c) => c.type === "material") && (
+              <span className="text-blue-300 ml-2">Önce kart çek 👆</span>
+            )}
+          </div>
+          {isMyTurn && (
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={endTurn}
+              disabled={!hasDrawnThisTurn}
+              className={cn(
+                "px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap",
+                hasDrawnThisTurn
+                  ? "bg-amber-500 text-black hover:bg-amber-400"
+                  : "bg-white/10 text-white/30 cursor-not-allowed"
+              )}
+            >
+              Sırayı Bitir →
+            </motion.button>
           )}
         </div>
       </div>
@@ -446,6 +469,8 @@ function OnlinePlayerHand() {
           {myHand.map((card, idx) => {
             const isSelected = selectedCards.includes(card.id);
             const isEvent = card.type === "event";
+            const isMaterial = card.type === "material";
+            const isNeeded = isMaterial && neededMaterials.has((card as MaterialCard).materialType);
             return (
               <motion.div
                 key={card.id}
@@ -464,6 +489,11 @@ function OnlinePlayerHand() {
                 {isEvent && (
                   <span className="absolute -top-1 -right-1 bg-yellow-400 text-black text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
                     ⚡
+                  </span>
+                )}
+                {isNeeded && !isSelected && (
+                  <span className="absolute -top-1 -left-1 bg-orange-400 text-black text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center shadow">
+                    🍽️
                   </span>
                 )}
               </motion.div>
@@ -546,10 +576,7 @@ export function OnlineGamePage() {
     players,
     myPlayerIndex,
     currentPlayerIndex,
-    endTurn,
     leaveRoom,
-    hasDrawnThisTurn,
-    canEndTurn,
     drawDeckSize,
     onlinePhase,
     roomCode,
@@ -598,21 +625,6 @@ export function OnlineGamePage() {
           <div className="text-white/30 text-xs bg-white/5 rounded-lg px-2 py-1">
             #{roomCode}
           </div>
-          {isMyTurn && (
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={endTurn}
-              disabled={!canEndTurn && !hasDrawnThisTurn}
-              className={cn(
-                "px-4 py-2 rounded-xl text-sm font-bold transition-all",
-                hasDrawnThisTurn
-                  ? "bg-amber-500 text-black hover:bg-amber-400"
-                  : "bg-white/10 text-white/40 cursor-not-allowed"
-              )}
-            >
-              Sırayı Bitir →
-            </motion.button>
-          )}
           <motion.button
             whileTap={{ scale: 0.95 }}
             onClick={leaveRoom}
