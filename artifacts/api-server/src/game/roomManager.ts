@@ -585,7 +585,9 @@ export function handleRematch(room: Room, socketId: string, targetPoints?: numbe
   if (room.hostSocketId !== socketId) return "Sadece oda sahibi tekrar oynayabilir!";
   if (room.state.phase !== "game_over") return "Oyun henüz bitmedi!";
 
+  const preservedWins = { ...room.wins };
   const err = startGame(room, targetPoints ?? room.state.victoryPoints);
+  room.wins = preservedWins;
   return err;
 }
 
