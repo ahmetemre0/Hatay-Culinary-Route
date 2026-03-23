@@ -96,6 +96,7 @@ export function MarketArea() {
                       card={food}
                       onClick={() => tryComplete(food.id)}
                       disabled={phase !== "playing" || current?.blockedFromRegion}
+                      playerHand={current?.hand}
                       className={cn(
                         cookingAnimation === food.id && "ring-4 ring-yellow-400 ring-offset-2",
                         isDoubled && "ring-4 ring-green-400 ring-offset-2 ring-offset-transparent",
@@ -138,18 +139,6 @@ export function MarketArea() {
                         </span>
                       </div>
                     )}
-                    <div className="mt-1 text-center text-[9px] flex flex-wrap gap-1 justify-center">
-                      {food.requiredMaterials.map((mat) => {
-                        const hasIt = current?.hand.some((c): c is MaterialCard => c.type === "material" && c.materialType === mat);
-                        const hasJoker = current?.hand.some((c): c is MaterialCard => c.type === "material" && c.materialType === "Joker");
-                        const highlighted = hasIt || hasJoker;
-                        return (
-                          <span key={mat} className={cn("px-1.5 py-0.5 rounded", highlighted ? "bg-yellow-400/80 text-black font-bold shadow-lg" : "text-white/40")}>
-                            {mat}
-                          </span>
-                        );
-                      })}
-                    </div>
                   </motion.div>
                 );
               })}
