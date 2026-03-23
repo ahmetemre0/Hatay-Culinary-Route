@@ -43,6 +43,7 @@ export type Room = {
   hostSocketId: string;
   state: ServerGameState;
   wins: Record<string, number>;
+  disconnectTimeouts: Map<string, NodeJS.Timeout>;
 };
 
 function generateCode(): string {

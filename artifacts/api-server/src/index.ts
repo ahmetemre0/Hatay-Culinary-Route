@@ -23,9 +23,11 @@ const io = new Server(httpServer, {
     origin: "*",
     methods: ["GET", "POST"],
   },
-  transports: ["websocket", "polling"],
-  pingInterval: 10000,
-  pingTimeout: 15000,
+  transports: ["polling", "websocket"],
+  pingInterval: 20000,
+  pingTimeout: 60000,
+  pollInterval: 10000,
+  maxHttpBufferSize: 1e6,
 });
 
 setupSocketHandler(io);

@@ -150,10 +150,11 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
 
     const socket = io(getSocketUrl(), {
       path: "/api/socket.io",
-      transports: ["websocket", "polling"],
-      reconnectionAttempts: 50,
-      reconnectionDelay: 300,
-      reconnectionDelayMax: 5000,
+      transports: ["polling", "websocket"],
+      reconnectionAttempts: 100,
+      reconnectionDelay: 200,
+      reconnectionDelayMax: 3000,
+      upgrade: true,
     });
 
     socket.on("connect", () => {
