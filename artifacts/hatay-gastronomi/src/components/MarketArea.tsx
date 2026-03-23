@@ -100,9 +100,15 @@ export function MarketArea() {
                         cookingAnimation === food.id && "ring-4 ring-yellow-400 ring-offset-2",
                         isDoubled && "ring-4 ring-green-400 ring-offset-2 ring-offset-transparent",
                         matchState === "match" && "ring-4 ring-green-400 ring-offset-2",
-                        matchState === "mismatch" && "opacity-50"
+                        matchState === "mismatch" && "opacity-50",
+                        current?.blockedFromRegion && "opacity-60"
                       )}
                     />
+                    {current?.blockedFromRegion && (
+                      <div className="mt-1 text-center text-orange-400 text-[10px] font-medium">
+                        ⚠️ Bu tur tamamlanamaz
+                      </div>
+                    )}
 
                     {isDoubled && (
                       <motion.div

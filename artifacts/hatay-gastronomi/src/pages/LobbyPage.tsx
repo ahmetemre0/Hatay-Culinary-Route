@@ -29,6 +29,7 @@ export function LobbyPage({ onBack }: Props) {
   const [joinCode, setJoinCode] = useState("");
   const [tab, setTab] = useState<"create" | "join">("create");
   const [localName, setLocalName] = useState(playerName || "");
+  const [targetPoints, setTargetPoints] = useState(50);
 
   useEffect(() => {
     connect();
@@ -221,15 +222,44 @@ export function LobbyPage({ onBack }: Props) {
             )}
 
             {isHost ? (
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                disabled={players.length < 2}
-                onClick={startGame}
-                className="w-full bg-gradient-to-r from-amber-500 to-red-500 text-white font-bold py-4 rounded-xl shadow-lg disabled:opacity-40 disabled:cursor-not-allowed text-lg"
-              >
-                🚀 Oyunu Başlat! ({players.length} Oyuncu)
-              </motion.button>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-white/60 text-xs font-medium block mb-1.5">🎯 Hedef Puan</label>
+                  <div className="flex gap-2">
+                    {[30, 50, 75, 100].map((pts) => (
+                      <button
+                        key={pts}
+                        onClick={() => setTargetPoints(pts)}
+                        className={cn(
+                          "flex-1 py-1.5 rounded-lg text-sm font-semibold transition-all",
+                          targetPoints === pts
+                            ? "bg-amber-500 text-black"
+                            : "bg-white/10 text-white/60 hover:bg-white/20"
+                        )}
+                      >
+                        {pts}
+                      </button>
+                    ))}
+                    <input
+                      type="number"
+                      value={targetPoints}
+                      onChange={(e) => setTargetPoints(Math.max(10, parseInt(e.target.value) || 50))}
+                      className="w-16 bg-white/10 border border-white/20 rounded-lg px-2 py-1.5 text-white text-sm text-center focus:outline-none focus:border-amber-400"
+                      min={10}
+                      max={500}
+                    />
+                  </div>
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  disabled={players.length < 2}
+                  onClick={() => startGame(targetPoints)}
+                  className="w-full bg-gradient-to-r from-amber-500 to-red-500 text-white font-bold py-4 rounded-xl shadow-lg disabled:opacity-40 disabled:cursor-not-allowed text-lg"
+                >
+                  🚀 Oyunu Başlat! ({players.length} Oyuncu)
+                </motion.button>
+              </div>
             ) : (
               <div className="text-center text-white/50 text-sm py-3 animate-pulse">
                 ⏳ Oda sahibinin oyunu başlatması bekleniyor...

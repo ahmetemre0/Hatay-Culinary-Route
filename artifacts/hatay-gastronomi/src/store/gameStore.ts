@@ -55,7 +55,7 @@ type GameState = {
   cookingAnimation: string | null;
   doubledMarketFoodId: string | null;
 
-  startGame: (numPlayers: number, names: string[]) => void;
+  startGame: (numPlayers: number, names: string[], targetPoints?: number) => void;
   drawCard: () => void;
   selectCard: (cardId: string) => void;
   tryComplete: (foodId: string) => void;
@@ -146,7 +146,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   cookingAnimation: null,
   doubledMarketFoodId: null,
 
-  startGame: (numPlayers, names) => {
+  startGame: (numPlayers, names, targetPoints) => {
     const { foodDeck, materialEventDeck } = buildInitialDecks();
     let deck = [...materialEventDeck];
 
@@ -159,18 +159,22 @@ export const useGameStore = create<GameState>((set, get) => ({
     let fDeck = [...foodDeck];
     while (market.length < 3 && fDeck.length > 0) market.push(fDeck.shift()!);
 
+    const startingPlayerIndex = Math.floor(Math.random() * numPlayers);
+    const victoryPts = (targetPoints && targetPoints > 0) ? targetPoints : 50;
+
     let logs: GameLog[] = [];
     let counter = 0;
     let r = addLog(logs, counter, "Oyun başladı! İyi eğlenceler 🎉", "success");
     logs = r.logs; counter = r.counter;
-    r = addLog(logs, counter, `${names[0]}'ın sırası`, "info");
+    r = addLog(logs, counter, `${names[startingPlayerIndex]} ilk başlıyor!`, "info");
     logs = r.logs; counter = r.counter;
 
     set({
-      phase: "playing", players, currentPlayerIndex: 0,
+      phase: "playing", players, currentPlayerIndex: startingPlayerIndex,
       marketFoods: market, drawDeck: deck, foodDeck: fDeck, discardPile: [],
       selectedCards: [], logs, logIdCounter: counter, winnerIndex: null,
       hasDrawnThisTurn: false, canEndTurn: false, doubledMarketFoodId: null,
+      victoryPoints: victoryPts,
     });
   },
 

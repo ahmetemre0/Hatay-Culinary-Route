@@ -72,7 +72,7 @@ const FOOD_TEMPLATES: Omit<FoodCard, "id" | "type">[] = [
   { name: "Babagannuş", requiredMaterials: ["Sebze", "ZeytinYagi", "Ates", "NarEksisi"], points: 11, emoji: "🍆", color: "from-purple-600 to-purple-800" },
   { name: "Nemmuş (Sarmaiçi / Kısır)", requiredMaterials: ["Sebze", "ZeytinYagi", "NarEksisi", "Bulgur"], points: 10, emoji: "🥗", color: "from-green-500 to-green-700" },
   { name: "Beton (Bakla)", requiredMaterials: ["Sebze", "ZeytinYagi", "Nohut", "Tahin"], points: 10, emoji: "🫛", color: "from-green-600 to-emerald-800" },
-  { name: "Müfrüki", requiredMaterials: ["Et", "ZeytinYagi", "Patates", "Bulgur"], points: 10, emoji: "🫕", color: "from-amber-700 to-amber-900" },
+  { name: "Patates Köftesi", requiredMaterials: ["Et", "ZeytinYagi", "Patates", "Bulgur"], points: 10, emoji: "🫕", color: "from-amber-700 to-amber-900" },
 ];
 
 const MATERIAL_TEMPLATES: { materialType: MaterialType; name: string; emoji: string; color: string; count: number }[] = [
@@ -96,7 +96,7 @@ const MATERIAL_TEMPLATES: { materialType: MaterialType; name: string; emoji: str
 
 const EVENT_TEMPLATES: Omit<EventCard, "id" | "type">[] = [
   { effectName: "Samandağ Biberi", description: "Bir rakibin bu tur atlamasına neden ol!", action: "skip_turn", emoji: "🌶️", color: "from-red-600 to-red-800" },
-  { effectName: "Asi Nehri Taştı", description: "Herkes elindeki kart sayısı kadar ek kart çeker.", action: "reshuffle_all", emoji: "🌊", color: "from-blue-400 to-blue-700" },
+  { effectName: "Asi Nehri Taştı", description: "Herkes elindeki tüm kartları desteye koyup rastgele olarak yeniden çeker.", action: "reshuffle_all", emoji: "🌊", color: "from-blue-400 to-blue-700" },
   { effectName: "Misafirperverlik", description: "Bir rakibinden rastgele 1 kart çek.", action: "steal_card", emoji: "🤝", color: "from-teal-400 to-teal-600" },
   { effectName: "Bereketli Topraklar", description: "Desteden fazladan 2 kart çek.", action: "draw_two", emoji: "🌿", color: "from-green-500 to-green-700" },
   { effectName: "Esnaf Dayanışması", description: "Bir oyuncunun rastgele 2 kartıyla kendi 2 kartını takas et.", action: "trade_two", emoji: "🏪", color: "from-yellow-500 to-yellow-700" },

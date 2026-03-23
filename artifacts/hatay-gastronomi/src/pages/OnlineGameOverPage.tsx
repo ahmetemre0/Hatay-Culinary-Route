@@ -6,7 +6,7 @@ type Props = {
 };
 
 export function OnlineGameOverPage({ onBack }: Props) {
-  const { players, winnerIndex, roomCode } = useOnlineStore();
+  const { players, winnerIndex, roomCode, isHost, rematch } = useOnlineStore();
   const winner = winnerIndex !== null ? players[winnerIndex] : null;
   const sorted = [...players].sort((a, b) => b.points - a.points);
 
@@ -34,7 +34,7 @@ export function OnlineGameOverPage({ onBack }: Props) {
         )}
         <p className="text-white/30 text-xs mb-6">Oda: #{roomCode}</p>
 
-        <div className="space-y-3 mb-8">
+        <div className="space-y-3 mb-6">
           {sorted.map((player, rank) => (
             <motion.div
               key={rank}
@@ -54,7 +54,7 @@ export function OnlineGameOverPage({ onBack }: Props) {
                 <div className="text-left">
                   <div className="text-white font-medium">{player.name}</div>
                   <div className="text-white/50 text-xs">
-                    {player.scoredFoods.length} sipariş tamamlandı
+                    {player.scoredFoods.length} sipariş · 🏆 {player.wins} kazanma
                   </div>
                 </div>
               </div>
@@ -65,14 +65,31 @@ export function OnlineGameOverPage({ onBack }: Props) {
           ))}
         </div>
 
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={onBack}
-          className="w-full bg-gradient-to-r from-amber-500 to-red-500 text-white font-bold py-4 rounded-xl text-lg"
-        >
-          🏠 Ana Menüye Dön
-        </motion.button>
+        <div className="flex flex-col gap-3">
+          {isHost && (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={rematch}
+              className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white font-bold py-4 rounded-xl text-lg"
+            >
+              🔄 Tekrar Oyna
+            </motion.button>
+          )}
+          {!isHost && (
+            <div className="text-center text-white/50 text-sm py-2 animate-pulse">
+              ⏳ Oda sahibinin yeni oyun başlatması bekleniyor...
+            </div>
+          )}
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={onBack}
+            className="w-full bg-white/10 hover:bg-white/20 text-white/70 font-bold py-3 rounded-xl text-base transition-all"
+          >
+            🏠 Ana Menüye Dön
+          </motion.button>
+        </div>
       </motion.div>
     </div>
   );

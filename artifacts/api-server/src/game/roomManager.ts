@@ -42,6 +42,7 @@ export type Room = {
   code: string;
   hostSocketId: string;
   state: ServerGameState;
+  wins: Record<string, number>;
 };
 
 function generateCode(): string {
@@ -85,7 +86,7 @@ export function createRoom(hostSocketId: string, playerName: string): Room {
   state.players.push({ name: playerName, socketId: hostSocketId, hand: [], scoredFoods: [], points: 0, skippedNextTurn: false, blockedFromRegion: false });
   addMessage(state, `${playerName} odayı oluşturdu`, "info");
 
-  const room: Room = { code, hostSocketId, state };
+  const room: Room = { code, hostSocketId, state, wins: {} };
   rooms.set(code, room);
   socketToRoom.set(hostSocketId, code);
   return room;
@@ -158,7 +159,7 @@ export function removePlayer(socketId: string): { room: Room | null; wasHost: bo
   return { room, wasHost, playerName };
 }
 
-export function startGame(room: Room): string | null {
+export function startGame(room: Room, targetPoints?: number): string | null {
   const state = room.state;
   if (state.players.length < 2) return "En az 2 oyuncu gerekli!";
 
@@ -174,12 +175,14 @@ export function startGame(room: Room): string | null {
   let fDeck = [...foodDeck];
   while (market.length < 3 && fDeck.length > 0) market.push(fDeck.shift()!);
 
+  const startingPlayerIndex = Math.floor(Math.random() * state.players.length);
+
   state.phase = "playing";
   state.drawDeck = deck;
   state.foodDeck = fDeck;
   state.marketFoods = market;
   state.discardPile = [];
-  state.currentPlayerIndex = 0;
+  state.currentPlayerIndex = startingPlayerIndex;
   state.winnerIndex = null;
   state.hasDrawnThisTurn = false;
   state.canEndTurn = false;
@@ -188,9 +191,10 @@ export function startGame(room: Room): string | null {
   state.cookingAnimation = null;
   state.messages = [];
   state.msgCounter = 0;
+  if (targetPoints && targetPoints > 0) state.victoryPoints = targetPoints;
 
   addMessage(state, "🎉 Oyun başladı! İyi eğlenceler!", "success");
-  addMessage(state, `${state.players[0].name}'ın sırası`, "info");
+  addMessage(state, `${state.players[startingPlayerIndex].name} ilk başlıyor!`, "info");
   return null;
 }
 
@@ -230,6 +234,7 @@ export function handleDrawCard(room: Room, socketId: string): string | null {
       state.phase = "game_over";
       const winner = [...state.players].sort((a, b) => b.points - a.points)[0];
       state.winnerIndex = state.players.findIndex(p => p.socketId === winner.socketId);
+      recordWinner(room, winner.name);
       addMessage(state, "Deste bitti! Oyun sona eriyor...", "warning");
       return null;
     }
@@ -298,6 +303,7 @@ export function handleTryComplete(room: Room, socketId: string, foodId: string, 
   if (cur.points >= state.victoryPoints) {
     state.phase = "game_over";
     state.winnerIndex = state.currentPlayerIndex;
+    recordWinner(room, cur.name);
     addMessage(state, `🏆 ${cur.name} kazandı! ${cur.points} puan!`, "success");
   }
 
@@ -410,6 +416,7 @@ export function handleUseEventCard(room: Room, socketId: string, cardId: string)
     if (cur.points >= state.victoryPoints) {
       state.phase = "game_over";
       state.winnerIndex = state.currentPlayerIndex;
+      recordWinner(room, cur.name);
       addMessage(state, `🏆 ${cur.name} kazandı! ${cur.points} puan!`, "success");
     }
     return {};
@@ -430,6 +437,7 @@ export function handleUseEventCard(room: Room, socketId: string, cardId: string)
     if (cur.points >= state.victoryPoints) {
       state.phase = "game_over";
       state.winnerIndex = state.currentPlayerIndex;
+      recordWinner(room, cur.name);
       addMessage(state, `🏆 ${cur.name} kazandı! ${cur.points} puan!`, "success");
     }
     return {};
@@ -568,6 +576,19 @@ export function handleEndTurn(room: Room, socketId: string): string | null {
   return null;
 }
 
+export function recordWinner(room: Room, playerName: string): void {
+  if (!room.wins[playerName]) room.wins[playerName] = 0;
+  room.wins[playerName]++;
+}
+
+export function handleRematch(room: Room, socketId: string, targetPoints?: number): string | null {
+  if (room.hostSocketId !== socketId) return "Sadece oda sahibi tekrar oynayabilir!";
+  if (room.state.phase !== "game_over") return "Oyun henüz bitmedi!";
+
+  const err = startGame(room, targetPoints ?? room.state.victoryPoints);
+  return err;
+}
+
 export function buildPlayerView(room: Room, playerIndex: number) {
   const state = room.state;
   const me = state.players[playerIndex];
@@ -585,6 +606,7 @@ export function buildPlayerView(room: Room, playerIndex: number) {
       scoredFoods: p.scoredFoods,
       skippedNextTurn: p.skippedNextTurn,
       blockedFromRegion: p.blockedFromRegion,
+      wins: room.wins[p.name] ?? 0,
     })),
     myHand: me?.hand ?? [],
     currentPlayerIndex: state.currentPlayerIndex,

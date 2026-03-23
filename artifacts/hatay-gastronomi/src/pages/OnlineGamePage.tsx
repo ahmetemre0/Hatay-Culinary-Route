@@ -5,48 +5,6 @@ import { GameCard } from "../components/GameCard";
 import { cn } from "@/lib/utils";
 import { Card, EventCard, MaterialCard, FoodCard, MaterialType } from "../data/cards";
 
-function ActionFeed() {
-  const messages = useOnlineStore((s) => s.messages);
-  const [shownIds, setShownIds] = useState<Set<number>>(new Set());
-  const [toasts, setToasts] = useState<Array<{ id: number; text: string; type: string }>>([]);
-
-  useEffect(() => {
-    if (messages.length === 0) return undefined;
-    const newest = messages[0];
-    if (shownIds.has(newest.id)) return undefined;
-    setShownIds((prev) => new Set([...prev, newest.id]));
-    setToasts((prev) => [newest, ...prev].slice(0, 4));
-    const t = setTimeout(() => {
-      setToasts((prev) => prev.filter((m) => m.id !== newest.id));
-    }, 4000);
-    return () => clearTimeout(t);
-  }, [messages]);
-
-  return (
-    <div className="fixed bottom-28 left-3 z-50 flex flex-col gap-2 w-64 pointer-events-none">
-      <AnimatePresence>
-        {toasts.map((msg) => (
-          <motion.div
-            key={msg.id}
-            initial={{ opacity: 0, x: -80, scale: 0.9 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: -80, scale: 0.9 }}
-            transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            className={cn(
-              "px-4 py-2.5 rounded-xl text-sm shadow-xl backdrop-blur-sm border",
-              msg.type === "success" && "bg-green-900/90 border-green-500/50 text-green-200",
-              msg.type === "warning" && "bg-yellow-900/90 border-yellow-500/50 text-yellow-200",
-              msg.type === "event" && "bg-purple-900/90 border-purple-500/50 text-purple-200",
-              msg.type === "info" && "bg-slate-800/90 border-white/20 text-white/80"
-            )}
-          >
-            {msg.text}
-          </motion.div>
-        ))}
-      </AnimatePresence>
-    </div>
-  );
-}
 
 function OnlineEventModal() {
   const {
@@ -193,7 +151,7 @@ function OnlineEventModal() {
 }
 
 function OtherPlayersArea() {
-  const { players, myPlayerIndex, currentPlayerIndex } = useOnlineStore();
+  const { players, myPlayerIndex, currentPlayerIndex, victoryPoints } = useOnlineStore();
 
   const others = players
     .map((p, i) => ({ ...p, index: i }))
@@ -260,7 +218,7 @@ function OtherPlayersArea() {
               </div>
               <div className="w-full bg-white/10 rounded-full h-1">
                 <motion.div
-                  animate={{ width: `${Math.min((player.points / 50) * 100, 100)}%` }}
+                  animate={{ width: `${Math.min((player.points / victoryPoints) * 100, 100)}%` }}
                   className="h-1 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500"
                 />
               </div>
@@ -309,10 +267,13 @@ function OnlineMarketArea() {
     currentPlayerIndex,
     myHand,
     selectedCards,
+    players,
   } = useOnlineStore();
 
   const isMyTurn = myPlayerIndex === currentPlayerIndex;
   const canAct = onlinePhase === "playing" && isMyTurn;
+  const myPlayer = players[myPlayerIndex];
+  const isBlocked = myPlayer?.blockedFromRegion ?? false;
 
   return (
     <div className="flex flex-col gap-4">
@@ -375,15 +336,21 @@ function OnlineMarketArea() {
                     >
                       <GameCard
                         card={food}
-                        onClick={canAct ? () => tryComplete(food.id) : undefined}
-                        disabled={!canAct}
+                        onClick={canAct && !isBlocked ? () => tryComplete(food.id) : undefined}
+                        disabled={!canAct || isBlocked}
                         className={cn(
                           isDoubled && "ring-2 ring-amber-400",
-                          matchState === "match" && "ring-2 ring-green-400",
-                          matchState === "mismatch" && "opacity-50"
+                          matchState === "match" && !isBlocked && "ring-2 ring-green-400",
+                          matchState === "mismatch" && "opacity-50",
+                          isBlocked && "opacity-60"
                         )}
                       />
                     </motion.div>
+                    {isBlocked && isMyTurn && (
+                      <div className="mt-1 text-center text-orange-400 text-[10px] font-medium">
+                        ⚠️ Bu tur tamamlanamaz
+                      </div>
+                    )}
                   </motion.div>
                 );
               })}
@@ -532,24 +499,28 @@ function MessagePanel() {
   const messages = useOnlineStore((s) => s.messages);
 
   return (
-    <div className="bg-black/30 backdrop-blur-sm rounded-2xl p-3 border border-white/10 flex flex-col gap-1 max-h-36 overflow-y-auto">
-      <div className="text-white/50 text-[10px] uppercase tracking-wider mb-1">📜 Son Aksiyonlar</div>
+    <div className="bg-black/40 backdrop-blur-sm rounded-2xl p-3 border border-white/20 flex flex-col gap-1 flex-1 overflow-y-auto min-h-[8rem] max-h-64">
+      <div className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+        <span>📜</span> Son Aksiyonlar
+      </div>
       {messages.length === 0 && (
         <div className="text-white/30 text-xs">Henüz aksiyon yok...</div>
       )}
-      {messages.slice(0, 15).map((m) => (
-        <div
+      {messages.slice(0, 20).map((m) => (
+        <motion.div
           key={m.id}
+          initial={{ opacity: 0, x: -8 }}
+          animate={{ opacity: 1, x: 0 }}
           className={cn(
-            "text-xs rounded px-2 py-1",
-            m.type === "success" && "text-green-300",
-            m.type === "warning" && "text-yellow-300",
-            m.type === "event" && "text-purple-300",
+            "text-xs rounded-lg px-2 py-1.5 leading-snug",
+            m.type === "success" && "bg-green-900/30 text-green-300",
+            m.type === "warning" && "bg-yellow-900/30 text-yellow-300",
+            m.type === "event" && "bg-purple-900/30 text-purple-300",
             m.type === "info" && "text-white/60"
           )}
         >
           {m.text}
-        </div>
+        </motion.div>
       ))}
     </div>
   );
@@ -583,6 +554,8 @@ function playGameSound(type: "your_turn" | "turn_end") {
   } catch {}
 }
 
+type MobileTab = "market" | "scores" | "actions" | "hand";
+
 export function OnlineGamePage() {
   const {
     players,
@@ -594,6 +567,8 @@ export function OnlineGamePage() {
     roomCode,
     victoryPoints,
   } = useOnlineStore();
+
+  const [mobileTab, setMobileTab] = useState<MobileTab>("market");
 
   const myPlayer = players[myPlayerIndex];
   const currentPlayer = players[currentPlayerIndex];
@@ -611,15 +586,62 @@ export function OnlineGamePage() {
     }
     if (isMyTurn && !prevIsMyTurn.current) {
       playGameSound("your_turn");
+      setMobileTab("market");
     } else if (!isMyTurn && prevIsMyTurn.current) {
       playGameSound("turn_end");
     }
     prevIsMyTurn.current = isMyTurn;
   }, [isMyTurn, onlinePhase]);
 
+  const ScoreboardPanel = () => (
+    <div className="bg-black/30 backdrop-blur-sm rounded-2xl p-3 border border-white/10 space-y-2">
+      <h3 className="text-white font-semibold text-xs text-center uppercase tracking-wider">
+        🏆 Puan Tablosu
+      </h3>
+      {[...players]
+        .map((p, i) => ({ ...p, index: i }))
+        .sort((a, b) => b.points - a.points)
+        .map((player, rank) => {
+          const isActive = player.index === currentPlayerIndex;
+          const isMe = player.index === myPlayerIndex;
+          const progress = Math.min((player.points / victoryPoints) * 100, 100);
+          return (
+            <motion.div
+              key={player.index}
+              animate={{ scale: isActive ? 1.02 : 1 }}
+              className={cn(
+                "rounded-xl p-2 border text-xs",
+                isActive ? "border-amber-400 bg-amber-400/10" : isMe ? "border-blue-400/50 bg-blue-400/5" : "border-white/10 bg-white/5"
+              )}
+            >
+              <div className="flex justify-between items-center mb-1">
+                <span className={cn("font-medium", isActive ? "text-amber-300" : isMe ? "text-blue-300" : "text-white/80")}>
+                  {rank === 0 ? "🥇" : rank === 1 ? "🥈" : rank === 2 ? "🥉" : "👤"} {player.name}
+                  {isMe && <span className="text-white/40 ml-1">(sen)</span>}
+                  {isActive && <span className="ml-1 animate-pulse">◀</span>}
+                </span>
+                <span className={cn("font-bold", isActive ? "text-amber-300" : "text-white")}>
+                  ⭐{player.points}
+                </span>
+              </div>
+              <div className="w-full bg-white/10 rounded-full h-1">
+                <motion.div
+                  animate={{ width: `${progress}%` }}
+                  className="h-1 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500"
+                />
+              </div>
+              <div className="mt-1 text-white/40">
+                {player.scoredFoods.length} sipariş · {player.cardCount} kart
+              </div>
+            </motion.div>
+          );
+        })}
+      <div className="text-center text-white/30 text-[10px]">Hedef: {victoryPoints} puan</div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-stone-950 via-amber-950 to-red-950 p-3 flex flex-col">
-      <ActionFeed />
       <OnlineEventModal />
 
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
@@ -647,53 +669,65 @@ export function OnlineGamePage() {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-3 flex-1">
-        <div className="lg:w-52 flex flex-col gap-3">
-          <div className="bg-black/30 backdrop-blur-sm rounded-2xl p-3 border border-white/10 space-y-2">
-            <h3 className="text-white font-semibold text-xs text-center uppercase tracking-wider">
-              🏆 Puan Tablosu
-            </h3>
-            {[...players]
-              .map((p, i) => ({ ...p, index: i }))
-              .sort((a, b) => b.points - a.points)
-              .map((player, rank) => {
-                const isActive = player.index === currentPlayerIndex;
-                const isMe = player.index === myPlayerIndex;
-                const progress = Math.min((player.points / victoryPoints) * 100, 100);
-                return (
-                  <motion.div
-                    key={player.index}
-                    animate={{ scale: isActive ? 1.02 : 1 }}
-                    className={cn(
-                      "rounded-xl p-2 border text-xs",
-                      isActive ? "border-amber-400 bg-amber-400/10" : isMe ? "border-blue-400/50 bg-blue-400/5" : "border-white/10 bg-white/5"
-                    )}
-                  >
-                    <div className="flex justify-between items-center mb-1">
-                      <span className={cn("font-medium", isActive ? "text-amber-300" : isMe ? "text-blue-300" : "text-white/80")}>
-                        {rank === 0 ? "🥇" : rank === 1 ? "🥈" : rank === 2 ? "🥉" : "👤"} {player.name}
-                        {isMe && <span className="text-white/40 ml-1">(sen)</span>}
-                        {isActive && <span className="ml-1 animate-pulse">◀</span>}
-                      </span>
-                      <span className={cn("font-bold", isActive ? "text-amber-300" : "text-white")}>
-                        ⭐{player.points}
-                      </span>
-                    </div>
-                    <div className="w-full bg-white/10 rounded-full h-1">
-                      <motion.div
-                        animate={{ width: `${progress}%` }}
-                        className="h-1 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500"
-                      />
-                    </div>
-                    <div className="mt-1 text-white/40">
-                      {player.scoredFoods.length} sipariş · {player.cardCount} kart
-                    </div>
-                  </motion.div>
-                );
-              })}
-            <div className="text-center text-white/30 text-[10px]">Hedef: {victoryPoints} puan</div>
-          </div>
+      {/* Mobile portrait layout */}
+      <div className="flex sm:hidden flex-col flex-1 gap-2">
+        <div className="flex gap-1 bg-black/30 rounded-xl p-1">
+          {(["market", "scores", "actions", "hand"] as MobileTab[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setMobileTab(tab)}
+              className={cn(
+                "flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all",
+                mobileTab === tab ? "bg-amber-500 text-black" : "text-white/50 hover:text-white/80"
+              )}
+            >
+              {tab === "market" ? "🍽️ Sipariş" : tab === "scores" ? "🏆 Puan" : tab === "actions" ? "📜 Aksiyon" : "🃏 El"}
+            </button>
+          ))}
+        </div>
 
+        <div className="flex-1 overflow-y-auto">
+          {mobileTab === "market" && (
+            <div className="space-y-2">
+              <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-3 border border-white/10">
+                <OtherPlayersArea />
+              </div>
+              <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-3 border border-white/10 flex items-center justify-center">
+                <OnlineMarketArea />
+              </div>
+            </div>
+          )}
+          {mobileTab === "scores" && <ScoreboardPanel />}
+          {mobileTab === "actions" && <MessagePanel />}
+          {mobileTab === "hand" && <OnlinePlayerHand />}
+        </div>
+
+        {mobileTab !== "hand" && (
+          <div className="pb-1">
+            <div className="inline-flex gap-4 bg-black/30 rounded-2xl px-4 py-2 border border-white/10 w-full justify-center">
+              <div className="text-center">
+                <div className="text-white/50 text-[10px] uppercase tracking-wider">Deste</div>
+                <div className="text-white font-bold text-sm">{drawDeckSize}</div>
+              </div>
+              <div className="w-px bg-white/10" />
+              <div className="text-center">
+                <div className="text-white/50 text-[10px] uppercase tracking-wider">El</div>
+                <div className="text-white font-bold text-sm">{myPlayer?.cardCount ?? 0}</div>
+              </div>
+              <div className="w-px bg-white/10" />
+              <div className="text-center">
+                <div className="text-white/50 text-[10px] uppercase tracking-wider">Puan</div>
+                <div className="text-yellow-300 font-bold text-sm">⭐ {myPlayer?.points ?? 0}</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Desktop landscape layout */}
+      <div className="hidden sm:flex flex-col lg:flex-row gap-3 flex-1">
+        <div className="lg:w-52 flex flex-col gap-3">
+          <ScoreboardPanel />
           <MessagePanel />
         </div>
 
@@ -731,7 +765,7 @@ export function OnlineGamePage() {
         </div>
       </div>
 
-      <div className="mt-2 text-center text-white/20 text-xs">
+      <div className="mt-2 text-center text-white/20 text-xs hidden sm:block">
         {isMyTurn ? "Kart çek → Malzemeleri seç → Sipariş kartına tıkla → Sırayı bitir" : "Diğer oyuncuların hamlesini bekle..."}
       </div>
     </div>

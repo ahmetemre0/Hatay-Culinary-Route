@@ -2,7 +2,7 @@ import { Server, Socket } from "socket.io";
 import {
   createRoom, joinRoom, rejoinRoom, getRoomBySocket, removePlayer, startGame,
   handleDrawCard, handleTryComplete, handleUseEventCard, handleResolveEvent,
-  handleEndTurn, buildPlayerView, Room,
+  handleEndTurn, buildPlayerView, handleRematch, Room,
 } from "./roomManager.js";
 
 function emitAll(io: Server, room: Room) {
@@ -37,11 +37,19 @@ export function setupSocketHandler(io: Server) {
       }
     });
 
-    socket.on("start_game", () => {
+    socket.on("start_game", ({ targetPoints }: { targetPoints?: number } = {}) => {
       const room = getRoomBySocket(socket.id);
       if (!room) { socket.emit("error_msg", { message: "Oda bulunamadı!" }); return; }
       if (room.hostSocketId !== socket.id) { socket.emit("error_msg", { message: "Sadece oda sahibi başlatabilir!" }); return; }
-      const err = startGame(room);
+      const err = startGame(room, targetPoints);
+      if (err) { socket.emit("error_msg", { message: err }); return; }
+      emitAll(io, room);
+    });
+
+    socket.on("rematch", ({ targetPoints }: { targetPoints?: number } = {}) => {
+      const room = getRoomBySocket(socket.id);
+      if (!room) { socket.emit("error_msg", { message: "Oda bulunamadı!" }); return; }
+      const err = handleRematch(room, socket.id, targetPoints);
       if (err) { socket.emit("error_msg", { message: err }); return; }
       emitAll(io, room);
     });
