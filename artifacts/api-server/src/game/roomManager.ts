@@ -125,6 +125,14 @@ export function rejoinRoom(newSocketId: string, code: string, playerName: string
   if (pIdx === -1) return { room: null, error: "Oyuncu bulunamadı!" };
 
   const oldSocketId = room.state.players[pIdx].socketId;
+  
+  // Grace period timeout'unu iptal et
+  const timeout = room.disconnectTimeouts.get(oldSocketId);
+  if (timeout) {
+    clearTimeout(timeout);
+    room.disconnectTimeouts.delete(oldSocketId);
+  }
+
   room.state.players[pIdx].socketId = newSocketId;
   socketToRoom.delete(oldSocketId);
   socketToRoom.set(newSocketId, code.toUpperCase());

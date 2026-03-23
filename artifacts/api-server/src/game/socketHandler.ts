@@ -127,9 +127,43 @@ export function setupSocketHandler(io: Server) {
       if (room) emitAll(io, room);
     });
 
+    // Keep-alive: client'den gelen ping'i işle
+    socket.on("keep_alive", () => {
+      // Socket hala aktif, hiçbir şey yapma
+    });
+
     socket.on("disconnect", () => {
-      const { room } = removePlayer(socket.id);
-      if (room) emitAll(io, room);
+      const room = getRoomBySocket(socket.id);
+      if (!room) return;
+
+      const pIdx = room.state.players.findIndex(p => p.socketId === socket.id);
+      if (pIdx === -1) return;
+
+      const playerName = room.state.players[pIdx].name;
+      const oldSocketId = socket.id;
+
+      socketToRoom.delete(socket.id);
+      addMessage(room.state, `${playerName} bağlantısı kesildi`, "warning");
+      emitAll(io, room);
+
+      // Grace period: 120 saniye içinde rejoin olmadığında oyuncuyu sil
+      const timeout = setTimeout(() => {
+        const stillConnected = room.state.players.find(p => p.socketId === oldSocketId);
+        if (stillConnected) {
+          room.state.players = room.state.players.filter(p => p.socketId !== oldSocketId);
+          if (room.state.players.length === 0) {
+            rooms.delete(room.code);
+          } else {
+            addMessage(room.state, `${playerName} oynayamadığı için çıkarıldı`, "warning");
+            if (room.hostSocketId === oldSocketId && room.state.players.length > 0) {
+              room.hostSocketId = room.state.players[0].socketId;
+            }
+            emitAll(io, room);
+          }
+        }
+      }, 120000);
+
+      room.disconnectTimeouts.set(oldSocketId, timeout);
     });
   });
 }

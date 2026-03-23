@@ -164,6 +164,13 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       if (session && (onlinePhase === "playing" || onlinePhase === "event_pending" || onlinePhase === "game_over")) {
         socket.emit("rejoin_room", { roomCode: session.roomCode, playerName: session.playerName });
       }
+
+      // Aggressive keep-alive: her 5 saniyede ping gönder
+      const keepAliveInterval = setInterval(() => {
+        if (socket.connected) socket.emit("keep_alive");
+      }, 5000);
+
+      socket.once("disconnect", () => clearInterval(keepAliveInterval));
     });
 
     socket.on("disconnect", () => { set({ connected: false }); });
