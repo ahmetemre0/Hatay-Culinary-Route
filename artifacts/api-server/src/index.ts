@@ -24,6 +24,8 @@ const io = new Server(httpServer, {
     methods: ["GET", "POST"],
   },
   transports: ["websocket", "polling"],
+  pingInterval: 10000,
+  pingTimeout: 15000,
 });
 
 setupSocketHandler(io);
