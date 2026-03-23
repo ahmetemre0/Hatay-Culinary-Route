@@ -351,6 +351,18 @@ function OnlineMarketArea() {
                         ⚠️ Bu tur tamamlanamaz
                       </div>
                     )}
+                    <div className="mt-1 text-center text-[9px] flex flex-wrap gap-1 justify-center">
+                      {food.requiredMaterials.map((mat) => {
+                        const hasIt = myHand.some((c): c is MaterialCard => c.type === "material" && c.materialType === mat);
+                        const hasJoker = myHand.some((c): c is MaterialCard => c.type === "material" && c.materialType === "Joker");
+                        const highlighted = hasIt || hasJoker;
+                        return (
+                          <span key={mat} className={cn("px-1.5 py-0.5 rounded", highlighted ? "bg-yellow-400/80 text-black font-bold shadow-lg" : "text-white/40")}>
+                            {mat}
+                          </span>
+                        );
+                      })}
+                    </div>
                   </motion.div>
                 );
               })}
