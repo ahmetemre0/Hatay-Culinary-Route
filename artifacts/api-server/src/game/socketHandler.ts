@@ -147,23 +147,22 @@ export function setupSocketHandler(io: Server) {
       emitAll(io, room);
 
       // Grace period: 180 saniye içinde rejoin olmadığında oyuncuyu sil
+      // Ama ASLA room'u silme - oyuncular her zaman rejoin edebilsin
       const timeout = setTimeout(() => {
-        // Room hala exists mi kontrol et
         const currentRoom = rooms.get(room.code);
         if (!currentRoom) return;
 
         const stillConnected = currentRoom.state.players.find(p => p.socketId === oldSocketId);
         if (stillConnected) {
           currentRoom.state.players = currentRoom.state.players.filter(p => p.socketId !== oldSocketId);
+          addMessage(currentRoom.state, `${playerName} oynayamadığı için çıkarıldı`, "warning");
           
-          // Oyuncu sildikten sonra room boş olmuşsa ve oyun devam etmiyorsa sil
-          if (currentRoom.state.players.length === 0 && currentRoom.state.phase !== "playing" && currentRoom.state.phase !== "event_pending") {
-            rooms.delete(room.code);
-          } else if (currentRoom.state.players.length > 0) {
-            addMessage(currentRoom.state, `${playerName} oynayamadığı için çıkarıldı`, "warning");
-            if (currentRoom.hostSocketId === oldSocketId && currentRoom.state.players.length > 0) {
-              currentRoom.hostSocketId = currentRoom.state.players[0].socketId;
-            }
+          // Host'u güncelle ama room'u asla silme
+          if (currentRoom.hostSocketId === oldSocketId && currentRoom.state.players.length > 0) {
+            currentRoom.hostSocketId = currentRoom.state.players[0].socketId;
+          }
+          
+          if (currentRoom.state.players.length > 0) {
             emitAll(io, currentRoom);
           }
         }
