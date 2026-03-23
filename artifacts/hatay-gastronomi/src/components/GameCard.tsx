@@ -23,8 +23,7 @@ function FoodCardView({ card, small, playerHand }: { card: FoodCard; small?: boo
       <div className="flex flex-wrap gap-0.5 justify-center">
         {card.requiredMaterials.map((m, i) => {
           const hasIt = playerHand?.some((c): c is MaterialCard => c.type === "material" && c.materialType === m);
-          const hasJoker = playerHand?.some((c): c is MaterialCard => c.type === "material" && c.materialType === "Joker");
-          const highlighted = hasIt || hasJoker;
+          const highlighted = hasIt;
           return (
             <span
               key={i}
