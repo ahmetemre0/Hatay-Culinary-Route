@@ -10,9 +10,10 @@ type Props = {
   small?: boolean;
   disabled?: boolean;
   className?: string;
+  highlightedMaterials?: string[];
 };
 
-function FoodCardView({ card, small }: { card: FoodCard; small?: boolean }) {
+function FoodCardView({ card, small, highlightedMaterials }: { card: FoodCard; small?: boolean; highlightedMaterials?: string[] }) {
   return (
     <div className={cn("flex flex-col h-full justify-between", small ? "gap-0.5" : "gap-1")}>
       <div className={cn("text-center", small ? "text-2xl" : "text-4xl")}>{card.emoji}</div>
@@ -23,7 +24,13 @@ function FoodCardView({ card, small }: { card: FoodCard; small?: boolean }) {
         {card.requiredMaterials.map((m, i) => (
           <span
             key={i}
-            className={cn("bg-white/20 text-white rounded px-1 font-medium", small ? "text-[7px]" : "text-[10px]")}
+            className={cn(
+              "rounded px-1 font-medium",
+              small ? "text-[7px]" : "text-[10px]",
+              highlightedMaterials?.includes(m) 
+                ? "bg-yellow-400/60 text-yellow-900 font-bold" 
+                : "bg-white/20 text-white"
+            )}
           >
             {m}
           </span>
@@ -77,7 +84,7 @@ function EventCardView({ card, small }: { card: EventCard; small?: boolean }) {
   );
 }
 
-export function GameCard({ card, selected, onClick, faceDown, small, disabled, className }: Props) {
+export function GameCard({ card, selected, onClick, faceDown, small, disabled, className, highlightedMaterials }: Props) {
   const gradientClass =
     card.type === "food"
       ? (card as FoodCard).color
@@ -113,14 +120,14 @@ export function GameCard({ card, selected, onClick, faceDown, small, disabled, c
           <span className="text-3xl">🎴</span>
         </div>
       ) : (
-        <CardContent card={card} small={small} />
+        <CardContent card={card} small={small} highlightedMaterials={highlightedMaterials} />
       )}
     </motion.div>
   );
 }
 
-function CardContent({ card, small }: { card: Card; small?: boolean }) {
-  if (card.type === "food") return <FoodCardView card={card as FoodCard} small={small} />;
+function CardContent({ card, small, highlightedMaterials }: { card: Card; small?: boolean; highlightedMaterials?: string[] }) {
+  if (card.type === "food") return <FoodCardView card={card as FoodCard} small={small} highlightedMaterials={highlightedMaterials} />;
   if (card.type === "material") return <MaterialCardView card={card as MaterialCard} small={small} />;
   return <EventCardView card={card as EventCard} small={small} />;
 }

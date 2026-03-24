@@ -314,17 +314,18 @@ function OnlineMarketArea() {
   const isMyTurn = myPlayerIndex === currentPlayerIndex;
   const canAct = onlinePhase === "playing" && isMyTurn;
 
-  const haveCount = (food: typeof marketFoods[0], mat: MaterialType) => {
+  const getHighlighted = (food: typeof marketFoods[0]) => {
     const mats = myHand.filter((c): c is MaterialCard => c.type === "material");
+    const highlighted: MaterialType[] = [];
     let pool = [...mats];
-    for (let i = 0; i < food.requiredMaterials.length; i++) {
-      const r = food.requiredMaterials[i];
-      if (r === mat) {
-        const idx = pool.findIndex((m) => m.materialType === r);
-        if (idx !== -1) { pool.splice(idx, 1); return true; }
+    for (const mat of food.requiredMaterials) {
+      const idx = pool.findIndex((m) => m.materialType === mat);
+      if (idx !== -1) {
+        highlighted.push(mat);
+        pool.splice(idx, 1);
       }
     }
-    return false;
+    return highlighted;
   };
 
   return (
@@ -364,6 +365,7 @@ function OnlineMarketArea() {
                 const isDoubled = doubledMarketFoodId === food.id;
                 const isAnimating = cookingAnimation === food.id;
                 const matchState = canAct ? selectionMatchesFood(myHand, selectedCards, food.requiredMaterials) : "none";
+                const highlighted = getHighlighted(food);
                 return (
                   <motion.div
                     key={food.id}
@@ -393,9 +395,9 @@ function OnlineMarketArea() {
                         className={cn(
                           isDoubled && "ring-2 ring-amber-400",
                           matchState === "match" && "ring-2 ring-green-400",
-                          matchState === "mismatch" && "opacity-50",
-                          food.requiredMaterials.every(m => haveCount(food, m)) && !isDoubled && "ring-4 ring-yellow-400 ring-offset-1 ring-offset-transparent shadow-lg shadow-yellow-400/50"
+                          matchState === "mismatch" && "opacity-50"
                         )}
+                        highlightedMaterials={highlighted}
                       />
                     </motion.div>
                     {isDoubled && (

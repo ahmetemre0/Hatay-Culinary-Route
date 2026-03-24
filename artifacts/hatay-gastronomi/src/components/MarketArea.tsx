@@ -78,17 +78,18 @@ export function MarketArea() {
                 const matchState = phase === "playing" && !current?.blockedFromRegion
                   ? selectionMatchesFood(food.id)
                   : "none";
-                const haveCount = (mat: string) => {
+                const getHighlighted = () => {
                   const hand = current?.hand.filter((c): c is MaterialCard => c.type === "material") ?? [];
+                  const highlighted: string[] = [];
                   let pool = [...hand];
-                  for (let i = 0; i < food.requiredMaterials.length; i++) {
-                    const r = food.requiredMaterials[i];
-                    if (r === mat) {
-                      const idx = pool.findIndex((m) => m.materialType === r);
-                      if (idx !== -1) { pool.splice(idx, 1); return true; }
+                  for (const mat of food.requiredMaterials) {
+                    const idx = pool.findIndex((m) => m.materialType === mat);
+                    if (idx !== -1) {
+                      highlighted.push(mat);
+                      pool.splice(idx, 1);
                     }
                   }
-                  return false;
+                  return highlighted;
                 };
                 return (
                   <motion.div
@@ -112,9 +113,9 @@ export function MarketArea() {
                         cookingAnimation === food.id && "ring-4 ring-yellow-400 ring-offset-2",
                         isDoubled && "ring-4 ring-green-400 ring-offset-2 ring-offset-transparent",
                         matchState === "match" && "ring-4 ring-green-400 ring-offset-2",
-                        matchState === "mismatch" && "opacity-50",
-                        food.requiredMaterials.every(r => haveCount(r)) && !isDoubled && !cookingAnimation && "ring-4 ring-yellow-400 ring-offset-1 ring-offset-transparent shadow-lg shadow-yellow-400/50"
+                        matchState === "mismatch" && "opacity-50"
                       )}
+                      highlightedMaterials={getHighlighted()}
                     />
 
                     {isDoubled && (
