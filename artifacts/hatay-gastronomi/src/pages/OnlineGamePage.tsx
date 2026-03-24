@@ -10,18 +10,6 @@ function ActionFeed() {
   const [shownIds, setShownIds] = useState<Set<number>>(new Set());
   const [toasts, setToasts] = useState<Array<{ id: number; text: string; type: string }>>([]);
 
-  useEffect(() => {
-    if (messages.length === 0) return undefined;
-    const newest = messages[0];
-    if (shownIds.has(newest.id)) return undefined;
-    setShownIds((prev) => new Set([...prev, newest.id]));
-    setToasts((prev) => [newest, ...prev].slice(0, 4));
-    const t = setTimeout(() => {
-      setToasts((prev) => prev.filter((m) => m.id !== newest.id));
-    }, 4000);
-    return () => clearTimeout(t);
-  }, [messages]);
-
   return (
     <div className="fixed bottom-28 left-3 z-50 flex flex-col gap-2 w-64 pointer-events-none">
       <AnimatePresence>
