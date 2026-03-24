@@ -105,7 +105,7 @@ const EVENT_TEMPLATES: Omit<EventCard, "id" | "type">[] = [
   { effectName: "Memleket Hasreti", description: "Tamamladığın siparişler arasından en düşük puanlı yemeğin puanını ikiye katla.", action: "multiply_lowest_points", emoji: "🏡", color: "from-sky-500 to-blue-700" },
   { effectName: "Etobur", description: "Canın mangal çekti herhalde. Herkes elindeki Et kartlarını sana verir.", action: "collect_all_meat", emoji: "🥩", color: "from-red-500 to-red-700" },
   { effectName: "Araktini Kafa Yaptı", description: "Şefin yemek yaparken içme diye kaç defa kızacak sana. Sipariş penceresi tamamen yenilenir.", action: "refresh_orders", emoji: "🍾", color: "from-indigo-500 to-violet-700" },
-  { effectName: "Canımın İçi", description: "Evde en sevdiğin yemek pişiyor. 3 puan kazan!", action: "instant_points", emoji: "💝", color: "from-pink-500 to-rose-700" },
+  { effectName: "Yeruhe Kalbek", description: "Evde en sevdiğin yemek pişiyor. 3 puan kazan!", action: "instant_points", emoji: "💝", color: "from-pink-500 to-rose-700" },
   { effectName: "Cınno Nıtto", description: "Ortalık iyice karışır. Bir oyuncuyla elinizdeki tüm kartları takas edersiniz.", action: "swap_all_cards", emoji: "🔄", color: "from-teal-500 to-cyan-700" },
 ];
 
