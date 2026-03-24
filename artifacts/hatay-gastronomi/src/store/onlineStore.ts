@@ -46,6 +46,7 @@ export type PlayerView = {
   victoryPoints: number;
 };
 
+
 const SESSION_KEY = "hatay_game_session";
 
 function saveSession(roomCode: string, playerName: string) {
@@ -63,6 +64,7 @@ function loadSession(): { roomCode: string; playerName: string } | null {
 function clearSession() {
   try { localStorage.removeItem(SESSION_KEY); } catch {}
 }
+
 
 type OnlineState = {
   socket: Socket | null;
@@ -110,10 +112,11 @@ type OnlineState = {
   resetOnline: () => void;
 };
 
+
 function getSocketUrl(): string {
   return "https://hatay-culinary-route.onrender.com";
 }
-
+let heartbeatInterval: any = null; // Kalp atışı referansı
 export const useOnlineStore = create<OnlineState>((set, get) => ({
   socket: null,
   connected: false,
@@ -146,16 +149,26 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     const existing = get().socket;
     if (existing?.connected) return;
 
+    // 1. ZIRH: Sadece websocket ve sınırsız yeniden deneme
     const socket = io(getSocketUrl(), {
       path: "/api/socket.io",
-      transports: ["websocket", "polling"],
-      reconnectionAttempts: 10,
+      transports: ["websocket"], 
+      reconnection: true,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
+      timeout: 20000, // Timeout süresini belirginleştir
     });
 
     socket.on("connect", () => {
       set({ connected: true, errorMessage: null });
+      
+      // 2. ZIRH: Manuel Kalp Atışı (Render/Browser'ı uyanık tutar)
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+      heartbeatInterval = setInterval(() => {
+        if (socket.connected) socket.emit("client_ping");
+      }, 25000); // 25 saniyede bir vur
+
       const session = loadSession();
       if (session) {
         const state = get();
@@ -165,8 +178,21 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       }
     });
 
-    socket.on("disconnect", () => { set({ connected: false }); });
-    socket.on("connect_error", (err) => { set({ errorMessage: `Bağlantı hatası: ${err.message}` }); });
+    socket.on("disconnect", (reason) => { 
+      set({ connected: false }); 
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+      
+      // Eğer sunucu zorla kapattıysa tekrar bağlanmaya çalış
+      if (reason === "io server disconnect") {
+        socket.connect();
+      }
+    });
+
+    socket.on("connect_error", (err) => { 
+      // Sadece arayüzde gösterme, konsola da bas
+      console.warn("Socket Bağlantı Hatası:", err.message);
+      // Geçici hatalarda errorMessage basıp kullanıcıyı darlamamak için burayı sessiz tutabilirsin.
+    });
 
     socket.on("room_joined", ({ roomCode }: { roomCode: string }) => {
       const { playerName } = get();
@@ -219,14 +245,26 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     socket.on("error_msg", ({ message }: { message: string }) => { set({ errorMessage: message }); });
 
     set({ socket });
+
+    // 3. ZIRH: Sekme Uyandırma (Mobile/Desktop Tab Sleeping)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        const currentSocket = get().socket;
+        if (currentSocket && !currentSocket.connected) {
+          console.log("Sekme uyandı, bağlantı koptuğu için yeniden bağlanılıyor...");
+          currentSocket.connect();
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
   },
 
   disconnect: () => {
     const { socket } = get();
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
     socket?.disconnect();
     set({ socket: null, connected: false });
   },
-
   setPlayerName: (name) => set({ playerName: name }),
 
   createRoom: () => {
