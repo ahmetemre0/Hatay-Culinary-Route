@@ -112,7 +112,8 @@ export function MarketArea() {
                         cookingAnimation === food.id && "ring-4 ring-yellow-400 ring-offset-2",
                         isDoubled && "ring-4 ring-green-400 ring-offset-2 ring-offset-transparent",
                         matchState === "match" && "ring-4 ring-green-400 ring-offset-2",
-                        matchState === "mismatch" && "opacity-50"
+                        matchState === "mismatch" && "opacity-50",
+                        food.requiredMaterials.every(r => haveCount(r)) && !isDoubled && !cookingAnimation && "ring-4 ring-yellow-400 ring-offset-1 ring-offset-transparent shadow-lg shadow-yellow-400/50"
                       )}
                     />
 
@@ -137,21 +138,11 @@ export function MarketArea() {
                       </motion.div>
                     )}
 
-                    <div className="mt-1 text-center text-[10px]">
-                      {food.requiredMaterials.map((m, i) => (
-                        <span
-                          key={i}
-                          className={haveCount(m) ? "font-bold text-yellow-300" : "text-white/50"}
-                        >
-                          {m}{i < food.requiredMaterials.length - 1 ? " + " : ""}
-                        </span>
-                      ))}
-                      {isDoubled && (
-                        <span className="ml-2 text-green-400 font-bold">
-                          → ⭐{food.points * 2}
-                        </span>
-                      )}
-                    </div>
+                    {isDoubled && (
+                      <div className="mt-1 text-center text-[10px] text-green-400 font-bold">
+                        → ⭐{food.points * 2}
+                      </div>
+                    )}
                   </motion.div>
                 );
               })}

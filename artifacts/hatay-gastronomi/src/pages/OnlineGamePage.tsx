@@ -393,25 +393,16 @@ function OnlineMarketArea() {
                         className={cn(
                           isDoubled && "ring-2 ring-amber-400",
                           matchState === "match" && "ring-2 ring-green-400",
-                          matchState === "mismatch" && "opacity-50"
+                          matchState === "mismatch" && "opacity-50",
+                          food.requiredMaterials.every(m => haveCount(food, m)) && !isDoubled && "ring-4 ring-yellow-400 ring-offset-1 ring-offset-transparent shadow-lg shadow-yellow-400/50"
                         )}
                       />
                     </motion.div>
-                    <div className="mt-1 text-center text-[10px]">
-                      {food.requiredMaterials.map((m, i) => (
-                        <span
-                          key={i}
-                          className={haveCount(food, m) ? "font-bold text-yellow-300" : "text-white/50"}
-                        >
-                          {m}{i < food.requiredMaterials.length - 1 ? " + " : ""}
-                        </span>
-                      ))}
-                      {isDoubled && (
-                        <span className="ml-2 text-green-400 font-bold">
-                          → ⭐{food.points * 2}
-                        </span>
-                      )}
-                    </div>
+                    {isDoubled && (
+                      <div className="mt-1 text-center text-[10px] text-green-400 font-bold">
+                        → ⭐{food.points * 2}
+                      </div>
+                    )}
                   </motion.div>
                 );
               })}
