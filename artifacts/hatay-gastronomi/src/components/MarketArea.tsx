@@ -78,13 +78,18 @@ export function MarketArea() {
                 const matchState = phase === "playing" && !current?.blockedFromRegion
                   ? selectionMatchesFood(food.id)
                   : "none";
-                const missingMats = food.requiredMaterials.filter(r => {
-                  const mats = current?.hand.filter((c): c is MaterialCard => c.type === "material") ?? [];
-                  const pool = [...mats];
-                  const exact = pool.findIndex((m) => m.materialType === r);
-                  if (exact !== -1) { pool.splice(exact, 1); return false; }
-                  return true;
-                });
+                const haveCount = (mat: string) => {
+                  const hand = current?.hand.filter((c): c is MaterialCard => c.type === "material") ?? [];
+                  let pool = [...hand];
+                  for (let i = 0; i < food.requiredMaterials.length; i++) {
+                    const r = food.requiredMaterials[i];
+                    if (r === mat) {
+                      const idx = pool.findIndex((m) => m.materialType === r);
+                      if (idx !== -1) { pool.splice(idx, 1); return true; }
+                    }
+                  }
+                  return false;
+                };
                 return (
                   <motion.div
                     key={food.id}
@@ -132,23 +137,21 @@ export function MarketArea() {
                       </motion.div>
                     )}
 
-                    {missingMats.length > 0 && (
-                      <div className="mt-1 text-center text-[10px]">
-                        {missingMats.map((m, i) => (
-                          <span
-                            key={i}
-                            className="inline-block bg-red-500/60 text-white px-1 rounded mr-1"
-                          >
-                            {m}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    {isDoubled && (
-                      <div className="mt-1 text-center text-[10px] text-green-400 font-bold">
-                        → ⭐{food.points * 2}
-                      </div>
-                    )}
+                    <div className="mt-1 text-center text-[10px]">
+                      {food.requiredMaterials.map((m, i) => (
+                        <span
+                          key={i}
+                          className={haveCount(m) ? "font-bold text-yellow-300" : "text-white/50"}
+                        >
+                          {m}{i < food.requiredMaterials.length - 1 ? " + " : ""}
+                        </span>
+                      ))}
+                      {isDoubled && (
+                        <span className="ml-2 text-green-400 font-bold">
+                          → ⭐{food.points * 2}
+                        </span>
+                      )}
+                    </div>
                   </motion.div>
                 );
               })}
