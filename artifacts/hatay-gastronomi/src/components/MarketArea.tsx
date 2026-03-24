@@ -78,6 +78,13 @@ export function MarketArea() {
                 const matchState = phase === "playing" && !current?.blockedFromRegion
                   ? selectionMatchesFood(food.id)
                   : "none";
+                const missingMats = food.requiredMaterials.filter(r => {
+                  const mats = current?.hand.filter((c): c is MaterialCard => c.type === "material") ?? [];
+                  const pool = [...mats];
+                  const exact = pool.findIndex((m) => m.materialType === r);
+                  if (exact !== -1) { pool.splice(exact, 1); return false; }
+                  return true;
+                });
                 return (
                   <motion.div
                     key={food.id}
@@ -125,14 +132,23 @@ export function MarketArea() {
                       </motion.div>
                     )}
 
-                    <div className="mt-1 text-center text-[10px] text-white/60">
-                      {food.requiredMaterials.join(" + ")}
-                      {isDoubled && (
-                        <span className="ml-1 text-green-400 font-bold">
-                          → ⭐{food.points * 2}
-                        </span>
-                      )}
-                    </div>
+                    {missingMats.length > 0 && (
+                      <div className="mt-1 text-center text-[10px]">
+                        {missingMats.map((m, i) => (
+                          <span
+                            key={i}
+                            className="inline-block bg-red-500/60 text-white px-1 rounded mr-1"
+                          >
+                            {m}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {isDoubled && (
+                      <div className="mt-1 text-center text-[10px] text-green-400 font-bold">
+                        → ⭐{food.points * 2}
+                      </div>
+                    )}
                   </motion.div>
                 );
               })}

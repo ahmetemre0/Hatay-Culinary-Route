@@ -314,6 +314,16 @@ function OnlineMarketArea() {
   const isMyTurn = myPlayerIndex === currentPlayerIndex;
   const canAct = onlinePhase === "playing" && isMyTurn;
 
+  const getMissingMats = (req: MaterialType[]) => {
+    return req.filter(r => {
+      const mats = myHand.filter((c): c is MaterialCard => c.type === "material");
+      const pool = [...mats];
+      const exact = pool.findIndex((m) => m.materialType === r);
+      if (exact !== -1) { pool.splice(exact, 1); return false; }
+      return true;
+    });
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex gap-4 justify-center items-start flex-wrap">
@@ -351,6 +361,7 @@ function OnlineMarketArea() {
                 const isDoubled = doubledMarketFoodId === food.id;
                 const isAnimating = cookingAnimation === food.id;
                 const matchState = canAct ? selectionMatchesFood(myHand, selectedCards, food.requiredMaterials) : "none";
+                const missingMats = getMissingMats(food.requiredMaterials);
                 return (
                   <motion.div
                     key={food.id}
@@ -384,6 +395,18 @@ function OnlineMarketArea() {
                         )}
                       />
                     </motion.div>
+                    {missingMats.length > 0 && (
+                      <div className="mt-1 text-center text-[10px]">
+                        {missingMats.map((m, i) => (
+                          <span
+                            key={i}
+                            className="inline-block bg-red-500/60 text-white px-1 rounded mr-1"
+                          >
+                            {m}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </motion.div>
                 );
               })}
@@ -532,7 +555,7 @@ function MessagePanel() {
   const messages = useOnlineStore((s) => s.messages);
 
   return (
-    <div className="bg-black/30 backdrop-blur-sm rounded-2xl p-3 border border-white/10 flex flex-col gap-1 max-h-36 overflow-y-auto">
+    <div className="bg-black/30 backdrop-blur-sm rounded-2xl p-3 border border-white/10 flex flex-col gap-1 max-h-64 overflow-y-auto">
       <div className="text-white/50 text-[10px] uppercase tracking-wider mb-1">📜 Son Aksiyonlar</div>
       {messages.length === 0 && (
         <div className="text-white/30 text-xs">Henüz aksiyon yok...</div>
