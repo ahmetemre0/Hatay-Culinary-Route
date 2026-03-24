@@ -32,29 +32,29 @@ export type EventCard = {
 export type Card = FoodCard | MaterialCard | EventCard;
 
 const FOOD_TEMPLATES: Omit<FoodCard, "id" | "type">[] = [
-  { name: "Sürk", requiredMaterials: ["ZeytinYagi", "Peynir"], points: 5, emoji: "🧀", color: "from-yellow-400 to-amber-600" },
+  { name: "Sürki", requiredMaterials: ["ZeytinYagi", "Peynir"], points: 5, emoji: "🧀", color: "from-yellow-400 to-amber-600" },
   { name: "Haytalı", requiredMaterials: ["Seker", "Dondurma"], points: 6, emoji: "🍨", color: "from-pink-400 to-rose-600" },
   { name: "Yayladağı Lokumu", requiredMaterials: ["Seker", "Meyve"], points: 5, emoji: "🍬", color: "from-pink-500 to-purple-600" },
-  { name: "Müşebbek (KT)", requiredMaterials: ["Ekmek", "Seker"], points: 4, emoji: "🍩", color: "from-amber-400 to-orange-600" },
+  { name: "Halka Tatlı", requiredMaterials: ["Ekmek", "Seker"], points: 4, emoji: "🍩", color: "from-amber-400 to-orange-600" },
   { name: "Oruk", requiredMaterials: ["Et", "Bulgur"], points: 4, emoji: "🧆", color: "from-amber-600 to-amber-800" },
   { name: "Kaytaz", requiredMaterials: ["Et", "Ekmek"], points: 4, emoji: "🥐", color: "from-orange-500 to-amber-700" },
   { name: "Harbiye Kebap", requiredMaterials: ["Et", "Sebze", "Ekmek"], points: 7, emoji: "🍖", color: "from-red-600 to-red-800" },
   { name: "Humus", requiredMaterials: ["ZeytinYagi", "Nohut", "Tahin"], points: 9, emoji: "🫘", color: "from-yellow-500 to-amber-700" },
   { name: "Zeytin Salatası", requiredMaterials: ["ZeytinYagi", "NarEksisi", "Meyve"], points: 8, emoji: "🫒", color: "from-green-600 to-green-800" },
-  { name: "Bulgur Bi Ğades", requiredMaterials: ["Sebze", "ZeytinYagi", "Bulgur"], points: 7, emoji: "🌾", color: "from-amber-500 to-amber-700" },
+  { name: "Mercimekli Bulgur", requiredMaterials: ["Sebze", "ZeytinYagi", "Bulgur"], points: 7, emoji: "🌾", color: "from-amber-500 to-amber-700" },
   { name: "Katıklı", requiredMaterials: ["Ekmek", "Ates", "Peynir"], points: 8, emoji: "🫙", color: "from-slate-400 to-slate-600" },
   { name: "Kırıkhan Ciğeri", requiredMaterials: ["Et", "Ates", "Sos"], points: 7, emoji: "🥩", color: "from-red-700 to-red-900" },
   { name: "Kabak Tatlısı", requiredMaterials: ["Seker", "Meyve", "Tahin"], points: 10, emoji: "🎃", color: "from-orange-400 to-amber-600" },
   { name: "Künefe", requiredMaterials: ["Seker", "Peynir", "Dondurma"], points: 12, emoji: "🍯", color: "from-amber-300 to-amber-500" },
-  { name: "Thayrücet (Fellah Köftesi)", requiredMaterials: ["Sebze", "Sos", "Bulgur"], points: 7, emoji: "🫕", color: "from-red-500 to-red-700" },
+  { name: "Fellah Köftesi", requiredMaterials: ["Sebze", "Sos", "Bulgur"], points: 7, emoji: "🫕", color: "from-red-500 to-red-700" },
   { name: "Belen Tava", requiredMaterials: ["Et", "Sebze", "Ates"], points: 6, emoji: "🍳", color: "from-orange-600 to-red-700" },
-  { name: "Lahmilevarka (Kağıt Kebabı)", requiredMaterials: ["Et", "Sebze", "Ekmek", "Ates"], points: 8, emoji: "📜", color: "from-red-600 to-amber-700" },
+  { name: "Kağıt Kebabı", requiredMaterials: ["Et", "Sebze", "Ekmek", "Ates"], points: 8, emoji: "📜", color: "from-red-600 to-amber-700" },
   { name: "Tepsi Kebabı", requiredMaterials: ["Et", "Sebze", "Ates", "Sos"], points: 12, emoji: "🥘", color: "from-red-700 to-red-900" },
   { name: "Hatay Döner", requiredMaterials: ["Et", "Ekmek", "Sos", "Patates"], points: 12, emoji: "🥙", color: "from-orange-600 to-red-800" },
   { name: "Babagannuş", requiredMaterials: ["Sebze", "ZeytinYagi", "Ates", "NarEksisi"], points: 11, emoji: "🍆", color: "from-purple-600 to-purple-800" },
-  { name: "Nemmuş (Sarmaiçi / Kısır)", requiredMaterials: ["Sebze", "ZeytinYagi", "NarEksisi", "Bulgur"], points: 10, emoji: "🥗", color: "from-green-500 to-green-700" },
-  { name: "Beton (Bakla)", requiredMaterials: ["Sebze", "ZeytinYagi", "Nohut", "Tahin"], points: 10, emoji: "🫛", color: "from-green-600 to-emerald-800" },
-  { name: "Müfrüki", requiredMaterials: ["Et", "ZeytinYagi", "Patates", "Bulgur"], points: 10, emoji: "🫕", color: "from-amber-700 to-amber-900" },
+  { name: "Sarmaiçi", requiredMaterials: ["Sebze", "ZeytinYagi", "NarEksisi", "Bulgur"], points: 10, emoji: "🥗", color: "from-green-500 to-green-700" },
+  { name: "Bakla", requiredMaterials: ["Sebze", "ZeytinYagi", "Nohut", "Tahin"], points: 10, emoji: "🫛", color: "from-green-600 to-emerald-800" },
+  { name: "Patates Köftesi", requiredMaterials: ["Et", "ZeytinYagi", "Patates", "Bulgur"], points: 10, emoji: "🫕", color: "from-amber-700 to-amber-900" },
 ];
 
 const MATERIAL_TEMPLATES: { materialType: MaterialType; name: string; emoji: string; color: string; count: number }[] = [
@@ -78,17 +78,17 @@ const MATERIAL_TEMPLATES: { materialType: MaterialType; name: string; emoji: str
 
 const EVENT_TEMPLATES: Omit<EventCard, "id" | "type">[] = [
   { effectName: "Samandağ Biberi", description: "Bir rakibin bu tur atlamasına neden ol!", action: "skip_turn", emoji: "🌶️", color: "from-red-600 to-red-800" },
-  { effectName: "Asi Nehri Taştı", description: "Herkes elindeki kart sayısı kadar ek kart çeker.", action: "reshuffle_all", emoji: "🌊", color: "from-blue-400 to-blue-700" },
+  { effectName: "Asi Nehri Taştı", description: "Herkes elindeki tüm kartları desteye koyup yeniden çeker. Desteyi karıştırmayı unutmayın!", action: "reshuffle_all", emoji: "🌊", color: "from-blue-400 to-blue-700" },
   { effectName: "Misafirperverlik", description: "Bir rakibinden rastgele 1 kart çek.", action: "steal_card", emoji: "🤝", color: "from-teal-400 to-teal-600" },
   { effectName: "Bereketli Topraklar", description: "Desteden fazladan 2 kart çek.", action: "draw_two", emoji: "🌿", color: "from-green-500 to-green-700" },
   { effectName: "Esnaf Dayanışması", description: "Bir oyuncunun rastgele 2 kartıyla kendi 2 kartını takas et.", action: "trade_two", emoji: "🏪", color: "from-yellow-500 to-yellow-700" },
-  { effectName: "Sıcak Hava Dalgası", description: "Sen hariç tüm oyuncular bir sonraki tur sipariş tamamlayamaz.", action: "block_region", emoji: "☀️", color: "from-orange-400 to-yellow-500" },
-  { effectName: "Saray Caddesine Taşındık", description: "Sipariş penceresindeki bir yemeğin puanını 2 ile çarp!", action: "multiply_points", emoji: "🏰", color: "from-amber-400 to-amber-600" },
+  { effectName: "Sıcak Hava Dalgası", description: "Vantilatörün olması iyi olmuş. Sen hariç tüm oyuncular bir sonraki tur sipariş tamamlayamaz.", action: "block_region", emoji: "☀️", color: "from-orange-400 to-yellow-500" },
+  { effectName: "Saray Caddesine Taşındık", description: "Yemeğin değer kazandı. Sipariş penceresindeki bir yemeğin puanını 2 ile çarp!", action: "multiply_points", emoji: "🏰", color: "from-amber-400 to-amber-600" },
   { effectName: "Memleket Hasreti", description: "Tamamladığın siparişler arasından en düşük puanlı yemeğin puanını ikiye katla.", action: "multiply_lowest_points", emoji: "🏡", color: "from-sky-500 to-blue-700" },
-  { effectName: "Etobur", description: "Herkes elindeki Et kartlarını sana verir.", action: "collect_all_meat", emoji: "🥩", color: "from-red-500 to-red-700" },
-  { effectName: "Araktini Kafa Yaptı", description: "Sipariş penceresi tamamen yenilenir.", action: "refresh_orders", emoji: "🍾", color: "from-indigo-500 to-violet-700" },
-  { effectName: "Yaruhe Kalbek", description: "Annen sana en sevdiğin yemeği yaptı. 3 puan kazan!", action: "instant_points", emoji: "💝", color: "from-pink-500 to-rose-700" },
-  { effectName: "Cınno Nıtto", description: "Bir oyuncuyla elinizdeki tüm kartları takas edersiniz.", action: "swap_all_cards", emoji: "🔄", color: "from-teal-500 to-cyan-700" },
+  { effectName: "Etobur", description: "Canın mangal çekti herhalde. Herkes elindeki Et kartlarını sana verir.", action: "collect_all_meat", emoji: "🥩", color: "from-red-500 to-red-700" },
+  { effectName: "Araktini Kafa Yaptı", description: "Şefin yemek yaparken içme diye kaç defa kızacak sana. Sipariş penceresi tamamen yenilenir.", action: "refresh_orders", emoji: "🍾", color: "from-indigo-500 to-violet-700" },
+  { effectName: "Yeruhe Kalbek", description: "Evde en sevdiğin yemek pişiyor. 3 puan kazan!", action: "instant_points", emoji: "💝", color: "from-pink-500 to-rose-700" },
+  { effectName: "Cınno Nıtto", description: "Ortalık iyice karışır. Bir oyuncuyla elinizdeki tüm kartları takas edersiniz.", action: "swap_all_cards", emoji: "🔄", color: "from-teal-500 to-cyan-700" },
 ];
 
 const EVENT_COUNTS: Record<string, number> = {
