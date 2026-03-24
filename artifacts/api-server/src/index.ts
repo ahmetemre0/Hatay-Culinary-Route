@@ -2,6 +2,7 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import app from "./app.js";
 import { setupSocketHandler } from "./game/socketHandler.js";
+import { initDb } from "./game/db.js";
 
 const rawPort = process.env["PORT"];
 
@@ -32,6 +33,10 @@ const io = new Server(httpServer, {
 });
 
 setupSocketHandler(io);
+
+initDb()
+  .then(() => console.log("[DB] Initialized successfully"))
+  .catch(err => console.error("[DB] Init error:", err));
 
 httpServer.listen(port, () => {
   console.log(`Server listening on port ${port}`);

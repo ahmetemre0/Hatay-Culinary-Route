@@ -117,10 +117,17 @@ export function getRoom(code: string): Room | null {
 export function rejoinRoom(newSocketId: string, code: string, playerName: string): { room: Room | null; error?: string } {
   const room = rooms.get(code.toUpperCase());
   if (!room) return { room: null, error: "Oda bulunamadı!" };
-  if (room.state.phase === "lobby") return { room: null, error: "Oyun henüz başlamadı!" };
 
   const pIdx = room.state.players.findIndex(p => p.name === playerName);
-  if (pIdx === -1) return { room: null, error: "Oyuncu bulunamadı!" };
+
+  if (pIdx === -1) {
+    if (room.state.phase !== "lobby") return { room: null, error: "Oyuncu bu odada bulunamadı!" };
+    if (room.state.players.length >= 4) return { room: null, error: "Oda dolu! (Max 4 oyuncu)" };
+    room.state.players.push({ name: playerName, socketId: newSocketId, hand: [], scoredFoods: [], points: 0, skippedNextTurn: false, blockedFromRegion: false });
+    socketToRoom.set(newSocketId, code.toUpperCase());
+    addMessage(room.state, `${playerName} odaya katıldı`, "info");
+    return { room };
+  }
 
   const oldSocketId = room.state.players[pIdx].socketId;
   room.state.players[pIdx].socketId = newSocketId;
@@ -129,8 +136,16 @@ export function rejoinRoom(newSocketId: string, code: string, playerName: string
 
   if (room.hostSocketId === oldSocketId) room.hostSocketId = newSocketId;
 
-  addMessage(room.state, `${playerName} yeniden bağlandı`, "info");
+  if (room.state.phase !== "lobby") {
+    addMessage(room.state, `${playerName} yeniden bağlandı`, "info");
+  }
   return { room };
+}
+
+export function restoreRoomFromDb(code: string, hostSocketId: string, state: ServerGameState): Room {
+  const room: Room = { code: code.toUpperCase(), hostSocketId, state };
+  rooms.set(code.toUpperCase(), room);
+  return room;
 }
 
 export function removePlayer(socketId: string): { room: Room | null; wasHost: boolean; playerName: string } {

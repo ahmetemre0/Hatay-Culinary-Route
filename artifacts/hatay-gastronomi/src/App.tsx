@@ -64,8 +64,16 @@ function ModeSelectPage({ onSelectLocal, onSelectOnline }: { onSelectLocal: () =
   );
 }
 
+function getInitialMode(): GameMode {
+  try {
+    const urlRoom = new URLSearchParams(window.location.search).get("room");
+    if (urlRoom) return "online";
+  } catch {}
+  return "select";
+}
+
 function App() {
-  const [mode, setMode] = useState<GameMode>("select");
+  const [mode, setMode] = useState<GameMode>(getInitialMode);
   const localPhase = useGameStore((s) => s.phase);
   const onlinePhase = useOnlineStore((s) => s.onlinePhase);
   const resetGame = useGameStore((s) => s.resetGame);

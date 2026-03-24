@@ -7,6 +7,12 @@ type Props = {
   onBack: () => void;
 };
 
+function getRoomCodeFromUrl(): string {
+  try {
+    return new URLSearchParams(window.location.search).get("room") ?? "";
+  } catch { return ""; }
+}
+
 export function LobbyPage({ onBack }: Props) {
   const {
     connected,
@@ -26,9 +32,11 @@ export function LobbyPage({ onBack }: Props) {
     clearError,
   } = useOnlineStore();
 
-  const [joinCode, setJoinCode] = useState("");
-  const [tab, setTab] = useState<"create" | "join">("create");
+  const urlRoomCode = getRoomCodeFromUrl();
+  const [joinCode, setJoinCode] = useState(urlRoomCode);
+  const [tab, setTab] = useState<"create" | "join">(urlRoomCode ? "join" : "create");
   const [localName, setLocalName] = useState(playerName || "");
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     connect();
@@ -186,7 +194,18 @@ export function LobbyPage({ onBack }: Props) {
             <div className="bg-amber-500/20 border border-amber-400/50 rounded-2xl p-4 text-center">
               <div className="text-white/60 text-xs uppercase tracking-widest mb-1">Oda Kodu</div>
               <div className="text-4xl font-bold text-amber-300 tracking-widest">{roomCode}</div>
-              <div className="text-white/40 text-xs mt-1">Arkadaşlarınla paylaş!</div>
+              <button
+                onClick={() => {
+                  const url = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
+                  navigator.clipboard.writeText(url).then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  });
+                }}
+                className="mt-2 text-xs bg-white/10 hover:bg-white/20 text-white/70 hover:text-white px-3 py-1 rounded-lg transition-all"
+              >
+                {copied ? "✓ Link kopyalandı!" : "🔗 Davet linkini kopyala"}
+              </button>
             </div>
 
             <div className="bg-black/20 rounded-xl p-3">

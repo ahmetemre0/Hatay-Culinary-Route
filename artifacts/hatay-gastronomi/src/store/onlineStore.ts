@@ -46,7 +46,6 @@ export type PlayerView = {
   victoryPoints: number;
 };
 
-
 const SESSION_KEY = "hatay_game_session";
 
 function saveSession(roomCode: string, playerName: string) {
@@ -65,6 +64,32 @@ function clearSession() {
   try { localStorage.removeItem(SESSION_KEY); } catch {}
 }
 
+function getRoomCodeFromUrl(): string | null {
+  try {
+    return new URLSearchParams(window.location.search).get("room");
+  } catch { return null; }
+}
+
+function setUrlRoomCode(code: string) {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set("room", code);
+    window.history.replaceState(null, "", url.toString());
+  } catch {}
+}
+
+function clearUrlRoomCode() {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("room");
+    window.history.replaceState(null, "", url.toString());
+  } catch {}
+}
+
+const urlRoomCode = getRoomCodeFromUrl();
+const savedSession = loadSession();
+const initialRoomCode = urlRoomCode ?? savedSession?.roomCode ?? "";
+const initialPlayerName = savedSession?.playerName ?? "";
 
 type OnlineState = {
   socket: Socket | null;
@@ -97,6 +122,7 @@ type OnlineState = {
   connect: () => void;
   disconnect: () => void;
   setPlayerName: (name: string) => void;
+  setRoomCode: (code: string) => void;
   createRoom: () => void;
   joinRoom: (code: string) => void;
   startGame: () => void;
@@ -112,19 +138,20 @@ type OnlineState = {
   resetOnline: () => void;
 };
 
+let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 
 function getSocketUrl(): string {
   return "https://hatay-culinary-route.onrender.com";
 }
-let heartbeatInterval: any = null; // Kalp atışı referansı
+
 export const useOnlineStore = create<OnlineState>((set, get) => ({
   socket: null,
   connected: false,
   onlinePhase: "idle",
   errorMessage: null,
 
-  playerName: "",
-  roomCode: "",
+  playerName: initialPlayerName,
+  roomCode: initialRoomCode,
   isHost: false,
   myPlayerIndex: -1,
 
@@ -149,61 +176,59 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     const existing = get().socket;
     if (existing?.connected) return;
 
-    // 1. ZIRH: Sadece websocket ve sınırsız yeniden deneme
     const socket = io(getSocketUrl(), {
       path: "/api/socket.io",
-      transports: ["websocket"], 
+      transports: ["websocket"],
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      timeout: 20000, // Timeout süresini belirginleştir
+      timeout: 20000,
     });
 
     socket.on("connect", () => {
       set({ connected: true, errorMessage: null });
-      
-      // 2. ZIRH: Manuel Kalp Atışı (Render/Browser'ı uyanık tutar)
+
       if (heartbeatInterval) clearInterval(heartbeatInterval);
       heartbeatInterval = setInterval(() => {
         if (socket.connected) socket.emit("client_ping");
-      }, 25000); // 25 saniyede bir vur
+      }, 25000);
 
       const session = loadSession();
-      if (session) {
-        const state = get();
-        if (state.onlinePhase !== "idle" && state.onlinePhase !== "waiting_room") {
-          socket.emit("rejoin_room", { roomCode: session.roomCode, playerName: session.playerName });
-        }
+      const urlRoom = getRoomCodeFromUrl();
+      const roomCode = urlRoom ?? session?.roomCode;
+      const playerName = session?.playerName ?? get().playerName;
+
+      if (roomCode && playerName) {
+        socket.emit("rejoin_room", { roomCode, playerName });
       }
     });
 
-    socket.on("disconnect", (reason) => { 
-      set({ connected: false }); 
+    socket.on("disconnect", (reason) => {
+      set({ connected: false });
       if (heartbeatInterval) clearInterval(heartbeatInterval);
-      
-      // Eğer sunucu zorla kapattıysa tekrar bağlanmaya çalış
-      if (reason === "io server disconnect") {
-        socket.connect();
-      }
+      if (reason === "io server disconnect") socket.connect();
     });
 
-    socket.on("connect_error", (err) => { 
-      // Sadece arayüzde gösterme, konsola da bas
-      console.warn("Socket Bağlantı Hatası:", err.message);
-      // Geçici hatalarda errorMessage basıp kullanıcıyı darlamamak için burayı sessiz tutabilirsin.
+    socket.on("connect_error", (err) => {
+      console.warn("[Socket] Connection error:", err.message);
     });
 
     socket.on("room_joined", ({ roomCode }: { roomCode: string }) => {
       const { playerName } = get();
       saveSession(roomCode, playerName);
+      setUrlRoomCode(roomCode);
       set({ roomCode, onlinePhase: "waiting_room" });
     });
 
-    socket.on("rejoin_ok", () => { set({ errorMessage: null }); });
+    socket.on("rejoin_ok", () => {
+      set({ errorMessage: null });
+    });
+
     socket.on("rejoin_failed", ({ message }: { message: string }) => {
       clearSession();
-      set({ errorMessage: message, onlinePhase: "idle" });
+      clearUrlRoomCode();
+      set({ errorMessage: message, onlinePhase: "idle", roomCode: "" });
     });
 
     socket.on("game_state", (view: PlayerView) => {
@@ -216,7 +241,10 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       else if (view.phase === "game_over") onlinePhase = "game_over";
       else if (view.phase === "lobby") onlinePhase = "waiting_room";
 
-      if (onlinePhase === "game_over") clearSession();
+      if (onlinePhase === "game_over") {
+        clearSession();
+        clearUrlRoomCode();
+      }
 
       set({
         myPlayerIndex: view.myPlayerIndex,
@@ -242,16 +270,17 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       });
     });
 
-    socket.on("error_msg", ({ message }: { message: string }) => { set({ errorMessage: message }); });
+    socket.on("error_msg", ({ message }: { message: string }) => {
+      set({ errorMessage: message });
+    });
 
     set({ socket });
 
-    // 3. ZIRH: Sekme Uyandırma (Mobile/Desktop Tab Sleeping)
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         const currentSocket = get().socket;
         if (currentSocket && !currentSocket.connected) {
-          console.log("Sekme uyandı, bağlantı koptuğu için yeniden bağlanılıyor...");
+          console.log("[Socket] Tab visible, reconnecting...");
           currentSocket.connect();
         }
       }
@@ -265,7 +294,9 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     socket?.disconnect();
     set({ socket: null, connected: false });
   },
+
   setPlayerName: (name) => set({ playerName: name }),
+  setRoomCode: (code) => set({ roomCode: code }),
 
   createRoom: () => {
     const { socket, playerName } = get();
@@ -289,6 +320,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
   leaveRoom: () => {
     get().socket?.emit("leave_room");
     clearSession();
+    clearUrlRoomCode();
     set({ onlinePhase: "idle", roomCode: "", isHost: false, players: [], myHand: [], messages: [] });
   },
 
@@ -326,6 +358,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     socket?.emit("leave_room");
     socket?.disconnect();
     clearSession();
+    clearUrlRoomCode();
     set({
       socket: null, connected: false, onlinePhase: "idle", errorMessage: null,
       playerName: "", roomCode: "", isHost: false, myPlayerIndex: -1,
