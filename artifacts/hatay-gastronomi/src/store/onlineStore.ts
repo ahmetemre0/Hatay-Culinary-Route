@@ -111,7 +111,7 @@ type OnlineState = {
 };
 
 function getSocketUrl(): string {
-  return window.location.origin;
+  return "https://hatay-culinary-route.onrender.com";
 }
 
 export const useOnlineStore = create<OnlineState>((set, get) => ({
