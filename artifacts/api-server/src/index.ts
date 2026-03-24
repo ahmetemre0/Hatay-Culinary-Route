@@ -18,12 +18,12 @@ if (Number.isNaN(port) || port <= 0) {
 const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
-  path: "/api/socket.io",
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"],
-  },
-  transports: ["websocket", "polling"],
+  cors: { origin: "*" },
+  pingTimeout: 60000,    // 60 saniye boyunca cevap gelmezse kopar (Render için yüksek tut)
+  pingInterval: 25000,   // 25 saniyede bir sunucu client'ı yoklar
+  connectionStateRecovery: {
+    maxDisconnectionDuration: 2 * 60 * 1000, // 2 dakika içinde gelenleri hafızadan kurtar (Socket.io v4+)
+  }
 });
 
 setupSocketHandler(io);
