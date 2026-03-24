@@ -96,20 +96,13 @@ export function MarketArea() {
                       card={food}
                       onClick={() => tryComplete(food.id)}
                       disabled={phase !== "playing" || current?.blockedFromRegion}
-                      playerHand={current?.hand}
                       className={cn(
                         cookingAnimation === food.id && "ring-4 ring-yellow-400 ring-offset-2",
                         isDoubled && "ring-4 ring-green-400 ring-offset-2 ring-offset-transparent",
                         matchState === "match" && "ring-4 ring-green-400 ring-offset-2",
-                        matchState === "mismatch" && "opacity-50",
-                        current?.blockedFromRegion && "opacity-60"
+                        matchState === "mismatch" && "opacity-50"
                       )}
                     />
-                    {current?.blockedFromRegion && (
-                      <div className="mt-1 text-center text-orange-400 text-[10px] font-medium">
-                        ⚠️ Bu tur tamamlanamaz
-                      </div>
-                    )}
 
                     {isDoubled && (
                       <motion.div
@@ -132,13 +125,14 @@ export function MarketArea() {
                       </motion.div>
                     )}
 
-                    {isDoubled && (
-                      <div className="mt-1 text-center text-[10px]">
-                        <span className="text-green-400 font-bold">
-                          ⭐{food.points * 2}
+                    <div className="mt-1 text-center text-[10px] text-white/60">
+                      {food.requiredMaterials.join(" + ")}
+                      {isDoubled && (
+                        <span className="ml-1 text-green-400 font-bold">
+                          → ⭐{food.points * 2}
                         </span>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </motion.div>
                 );
               })}

@@ -9,11 +9,10 @@ type Props = {
 export function SetupPage({ onBack }: Props) {
   const [numPlayers, setNumPlayers] = useState(2);
   const [names, setNames] = useState(["Oyuncu 1", "Oyuncu 2", "Oyuncu 3", "Oyuncu 4"]);
-  const [targetPoints, setTargetPoints] = useState(50);
   const startGame = useGameStore((s) => s.startGame);
 
   const handleStart = () => {
-    startGame(numPlayers, names.slice(0, numPlayers), targetPoints);
+    startGame(numPlayers, names.slice(0, numPlayers));
   };
 
   return (
@@ -93,40 +92,10 @@ export function SetupPage({ onBack }: Props) {
             ))}
           </div>
 
-          <div>
-            <label className="text-white/70 text-sm font-medium block mb-2">
-              🎯 Hedef Puan
-            </label>
-            <div className="flex gap-2">
-              {[30, 50, 75, 100].map((pts) => (
-                <motion.button
-                  key={pts}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setTargetPoints(pts)}
-                  className={`flex-1 py-2 rounded-xl font-bold text-sm transition-all ${
-                    targetPoints === pts
-                      ? "bg-amber-500 text-black shadow-lg"
-                      : "bg-white/10 text-white/70 hover:bg-white/20"
-                  }`}
-                >
-                  {pts}
-                </motion.button>
-              ))}
-              <input
-                type="number"
-                value={targetPoints}
-                onChange={(e) => setTargetPoints(Math.max(10, parseInt(e.target.value) || 50))}
-                className="w-20 bg-white/10 border border-white/20 rounded-xl px-2 py-2 text-white text-sm text-center focus:outline-none focus:border-amber-400"
-                min={10}
-                max={500}
-              />
-            </div>
-          </div>
-
           <div className="bg-white/5 rounded-xl p-4 text-sm text-white/60 space-y-1.5">
             <p>🃏 Her oyuncuya 5 malzeme kartı dağıtılır</p>
             <p>🗺️ Masada 3 açık Bölge Kartı durur</p>
-            <p>⭐ İlk {targetPoints} puana ulaşan kazanır!</p>
+            <p>⭐ İlk 50 puana ulaşan kazanır!</p>
             <p>⚡ Olay Kartları oyunu renklendiriyor!</p>
           </div>
 

@@ -10,10 +10,9 @@ type Props = {
   small?: boolean;
   disabled?: boolean;
   className?: string;
-  playerHand?: Card[];
 };
 
-function FoodCardView({ card, small, playerHand }: { card: FoodCard; small?: boolean; playerHand?: Card[] }) {
+function FoodCardView({ card, small }: { card: FoodCard; small?: boolean }) {
   return (
     <div className={cn("flex flex-col h-full justify-between", small ? "gap-0.5" : "gap-1")}>
       <div className={cn("text-center", small ? "text-2xl" : "text-4xl")}>{card.emoji}</div>
@@ -21,22 +20,14 @@ function FoodCardView({ card, small, playerHand }: { card: FoodCard; small?: boo
         <div className={cn("font-bold text-white text-center leading-tight", small ? "text-[9px]" : "text-sm")}>{card.name}</div>
       </div>
       <div className="flex flex-wrap gap-0.5 justify-center">
-        {card.requiredMaterials.map((m, i) => {
-          const hasIt = playerHand?.some((c): c is MaterialCard => c.type === "material" && c.materialType === m);
-          const highlighted = hasIt;
-          return (
-            <span
-              key={i}
-              className={cn(
-                "rounded px-1 font-medium",
-                highlighted ? "bg-yellow-400/80 text-black shadow" : "bg-white/20 text-white",
-                small ? "text-[7px]" : "text-[10px]"
-              )}
-            >
-              {m}
-            </span>
-          );
-        })}
+        {card.requiredMaterials.map((m, i) => (
+          <span
+            key={i}
+            className={cn("bg-white/20 text-white rounded px-1 font-medium", small ? "text-[7px]" : "text-[10px]")}
+          >
+            {m}
+          </span>
+        ))}
       </div>
       <div className="flex justify-between items-center">
         <span className={cn("text-white/70", small ? "text-[8px]" : "text-xs")}>Sipariş</span>
@@ -86,7 +77,7 @@ function EventCardView({ card, small }: { card: EventCard; small?: boolean }) {
   );
 }
 
-export function GameCard({ card, selected, onClick, faceDown, small, disabled, className, playerHand }: Props) {
+export function GameCard({ card, selected, onClick, faceDown, small, disabled, className }: Props) {
   const gradientClass =
     card.type === "food"
       ? (card as FoodCard).color
@@ -122,14 +113,14 @@ export function GameCard({ card, selected, onClick, faceDown, small, disabled, c
           <span className="text-3xl">🎴</span>
         </div>
       ) : (
-        <CardContent card={card} small={small} playerHand={playerHand} />
+        <CardContent card={card} small={small} />
       )}
     </motion.div>
   );
 }
 
-function CardContent({ card, small, playerHand }: { card: Card; small?: boolean; playerHand?: Card[] }) {
-  if (card.type === "food") return <FoodCardView card={card as FoodCard} small={small} playerHand={playerHand} />;
+function CardContent({ card, small }: { card: Card; small?: boolean }) {
+  if (card.type === "food") return <FoodCardView card={card as FoodCard} small={small} />;
   if (card.type === "material") return <MaterialCardView card={card as MaterialCard} small={small} />;
   return <EventCardView card={card as EventCard} small={small} />;
 }

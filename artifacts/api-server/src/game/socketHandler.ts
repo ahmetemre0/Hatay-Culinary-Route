@@ -2,7 +2,7 @@ import { Server, Socket } from "socket.io";
 import {
   createRoom, joinRoom, rejoinRoom, getRoomBySocket, removePlayer, startGame,
   handleDrawCard, handleTryComplete, handleUseEventCard, handleResolveEvent,
-  handleEndTurn, buildPlayerView, handleRematch, Room,
+  handleEndTurn, buildPlayerView, Room,
 } from "./roomManager.js";
 
 function emitAll(io: Server, room: Room) {
@@ -37,19 +37,11 @@ export function setupSocketHandler(io: Server) {
       }
     });
 
-    socket.on("start_game", ({ targetPoints }: { targetPoints?: number } = {}) => {
+    socket.on("start_game", () => {
       const room = getRoomBySocket(socket.id);
       if (!room) { socket.emit("error_msg", { message: "Oda bulunamadı!" }); return; }
       if (room.hostSocketId !== socket.id) { socket.emit("error_msg", { message: "Sadece oda sahibi başlatabilir!" }); return; }
-      const err = startGame(room, targetPoints);
-      if (err) { socket.emit("error_msg", { message: err }); return; }
-      emitAll(io, room);
-    });
-
-    socket.on("rematch", ({ targetPoints }: { targetPoints?: number } = {}) => {
-      const room = getRoomBySocket(socket.id);
-      if (!room) { socket.emit("error_msg", { message: "Oda bulunamadı!" }); return; }
-      const err = handleRematch(room, socket.id, targetPoints);
+      const err = startGame(room);
       if (err) { socket.emit("error_msg", { message: err }); return; }
       emitAll(io, room);
     });
@@ -127,48 +119,9 @@ export function setupSocketHandler(io: Server) {
       if (room) emitAll(io, room);
     });
 
-    // Keep-alive: client'den gelen ping'i işle
-    socket.on("keep_alive", () => {
-      // Socket hala aktif, hiçbir şey yapma
-    });
-
     socket.on("disconnect", () => {
-      const room = getRoomBySocket(socket.id);
-      if (!room) return;
-
-      const pIdx = room.state.players.findIndex(p => p.socketId === socket.id);
-      if (pIdx === -1) return;
-
-      const playerName = room.state.players[pIdx].name;
-      const oldSocketId = socket.id;
-
-      socketToRoom.delete(socket.id);
-      addMessage(room.state, `${playerName} bağlantısı kesildi`, "warning");
-      emitAll(io, room);
-
-      // Grace period: 180 saniye içinde rejoin olmadığında oyuncuyu sil
-      // Ama ASLA room'u silme - oyuncular her zaman rejoin edebilsin
-      const timeout = setTimeout(() => {
-        const currentRoom = rooms.get(room.code);
-        if (!currentRoom) return;
-
-        const stillConnected = currentRoom.state.players.find(p => p.socketId === oldSocketId);
-        if (stillConnected) {
-          currentRoom.state.players = currentRoom.state.players.filter(p => p.socketId !== oldSocketId);
-          addMessage(currentRoom.state, `${playerName} oynayamadığı için çıkarıldı`, "warning");
-          
-          // Host'u güncelle ama room'u asla silme
-          if (currentRoom.hostSocketId === oldSocketId && currentRoom.state.players.length > 0) {
-            currentRoom.hostSocketId = currentRoom.state.players[0].socketId;
-          }
-          
-          if (currentRoom.state.players.length > 0) {
-            emitAll(io, currentRoom);
-          }
-        }
-      }, 180000);
-
-      room.disconnectTimeouts.set(oldSocketId, timeout);
+      const { room } = removePlayer(socket.id);
+      if (room) emitAll(io, room);
     });
   });
 }

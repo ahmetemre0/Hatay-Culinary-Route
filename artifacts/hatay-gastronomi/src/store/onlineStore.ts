@@ -15,7 +15,6 @@ export type OnlinePlayerInfo = {
   scoredFoods: FoodCard[];
   skippedNextTurn: boolean;
   blockedFromRegion: boolean;
-  wins: number;
 };
 
 export type OnlinePhase =
@@ -98,8 +97,7 @@ type OnlineState = {
   setPlayerName: (name: string) => void;
   createRoom: () => void;
   joinRoom: (code: string) => void;
-  startGame: (targetPoints?: number) => void;
-  rematch: () => void;
+  startGame: () => void;
   leaveRoom: () => void;
   drawCard: () => void;
   selectCard: (cardId: string) => void;
@@ -150,27 +148,21 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
 
     const socket = io(getSocketUrl(), {
       path: "/api/socket.io",
-      transports: ["polling", "websocket"],
-      reconnectionAttempts: 100,
-      reconnectionDelay: 200,
-      reconnectionDelayMax: 3000,
-      upgrade: true,
+      transports: ["websocket", "polling"],
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
     });
 
     socket.on("connect", () => {
       set({ connected: true, errorMessage: null });
       const session = loadSession();
-      const { onlinePhase } = get();
-      if (session && (onlinePhase === "playing" || onlinePhase === "event_pending" || onlinePhase === "game_over")) {
-        socket.emit("rejoin_room", { roomCode: session.roomCode, playerName: session.playerName });
+      if (session) {
+        const state = get();
+        if (state.onlinePhase !== "idle" && state.onlinePhase !== "waiting_room") {
+          socket.emit("rejoin_room", { roomCode: session.roomCode, playerName: session.playerName });
+        }
       }
-
-      // Aggressive keep-alive: her 5 saniyede ping gönder
-      const keepAliveInterval = setInterval(() => {
-        if (socket.connected) socket.emit("keep_alive");
-      }, 5000);
-
-      socket.once("disconnect", () => clearInterval(keepAliveInterval));
     });
 
     socket.on("disconnect", () => { set({ connected: false }); });
@@ -254,8 +246,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     set({ playerName: name });
   },
 
-  startGame: (targetPoints?: number) => { get().socket?.emit("start_game", { targetPoints }); },
-  rematch: () => { get().socket?.emit("rematch", { targetPoints: get().victoryPoints }); },
+  startGame: () => { get().socket?.emit("start_game"); },
 
   leaveRoom: () => {
     get().socket?.emit("leave_room");
