@@ -14,6 +14,12 @@ function emitAll(io: Server, room: Room) {
 
 export function setupSocketHandler(io: Server) {
   io.on("connection", (socket: Socket) => {
+    
+    // ZIRH: Client'tan gelen manuel kalp atışını karşıla (loglamaya gerek yok, sadece trafiği canlı tutar)
+    socket.on("client_ping", () => {
+      socket.emit("server_pong"); 
+    });
+
     socket.on("create_room", ({ playerName }: { playerName: string }) => {
       try {
         const room = createRoom(socket.id, playerName);
@@ -104,7 +110,10 @@ export function setupSocketHandler(io: Server) {
     socket.on("rejoin_room", ({ roomCode, playerName }: { roomCode: string; playerName: string }) => {
       try {
         const { room, error } = rejoinRoom(socket.id, roomCode, playerName);
-        if (error || !room) { socket.emit("rejoin_failed", { message: error ?? "Yeniden bağlanılamadı!" }); return; }
+        if (error || !room) { 
+          socket.emit("rejoin_failed", { message: error ?? "Yeniden bağlanılamadı!" }); 
+          return; 
+        }
         socket.join(room.code);
         socket.emit("rejoin_ok");
         emitAll(io, room);
@@ -113,13 +122,15 @@ export function setupSocketHandler(io: Server) {
       }
     });
 
+    // Disconnect yönetimi (Kopmaları hemen silmek yerine bir süre tolerans tanınabilir ama mevcut mantığını bozmadım)
     socket.on("leave_room", () => {
       const { room } = removePlayer(socket.id);
       socket.leave(room?.code ?? "");
       if (room) emitAll(io, room);
     });
 
-    socket.on("disconnect", () => {
+    socket.on("disconnect", (reason) => {
+      console.log(`Socket Koptu [${socket.id}], Sebep: ${reason}`);
       const { room } = removePlayer(socket.id);
       if (room) emitAll(io, room);
     });
