@@ -1,7 +1,7 @@
 import { Server, Socket } from "socket.io";
 import * as stableRM from "./roomManager.js";
 import * as devRM from "./dev/roomManager.js";
-import { saveRoom, loadRoom, deleteRoom, registerDevUser, loginDevUser, saveChatMessage, loadChatMessages, deleteChatMessages } from "./db.js";
+import { saveRoom, loadRoom, deleteRoom as deleteRoomFromDb, registerDevUser, loginDevUser, saveChatMessage, loadChatMessages, deleteChatMessages } from "./db.js";
 
 type RM = typeof stableRM;
 type Room = stableRM.Room;
@@ -42,7 +42,7 @@ function saveAsync(room: Room) {
 function scheduleDeleteIfGameOver(room: Room) {
   if (room.state.phase === "game_over") {
     setTimeout(() => {
-      deleteRoom(room.code).catch(err => console.error("[DB] Delete error:", err));
+      deleteRoomFromDb(room.code).catch(err => console.error("[DB] Delete error:", err));
       deleteChatMessages(room.code).catch(err => console.error("[DB] Chat delete error:", err));
     }, 60_000);
   }
@@ -329,13 +329,80 @@ export function setupSocketHandler(io: Server) {
     socket.on("leave_room", () => {
       const found = findBySocket(socket.id);
       if (found) {
+        const roomCode = found.room.code;
         const { room } = found.rm.removePlayer(socket.id) as { room: Room | null; wasHost: boolean; playerName: string };
-        socket.leave(found.room.code);
+        socket.leave(roomCode);
         if (room) {
           saveAsync(room);
           emitAll(io, room, found.rm);
         }
       }
+    });
+
+    socket.on("permanent_leave", () => {
+      const found = findBySocket(socket.id);
+      if (!found) {
+        socket.emit("you_left_permanently");
+        return;
+      }
+      const roomCode = found.room.code;
+      const result = devRM.permanentLeavePlayer(socket.id) as { room: devRM.Room | null; wasHost: boolean; playerName: string };
+      socket.leave(roomCode);
+      socket.emit("you_left_permanently");
+      if (result.room) {
+        saveAsync(result.room as unknown as Room);
+        scheduleDeleteIfGameOver(result.room as unknown as Room);
+        emitAll(io, result.room as unknown as Room, devRM as unknown as RM);
+      } else {
+        deleteRoomFromDb(roomCode).catch(err => console.error("[DB] Delete error:", err));
+        deleteChatMessages(roomCode).catch(err => console.error("[DB] Chat delete error:", err));
+      }
+    });
+
+    socket.on("delete_room", () => {
+      const found = findBySocket(socket.id);
+      if (!found) return;
+      if (found.room.hostSocketId !== socket.id) {
+        socket.emit("error_msg", { message: "Sadece oda sahibi odayı silebilir!" });
+        return;
+      }
+      const roomCode = found.room.code;
+      const socketIds = devRM.destroyRoom(roomCode);
+      socketIds.forEach(sid => {
+        io.to(sid).emit("room_deleted", { message: "Oda sahibi odayı sildi." });
+        const s = io.sockets.sockets.get(sid);
+        s?.leave(roomCode);
+      });
+      deleteRoomFromDb(roomCode).catch(err => console.error("[DB] Delete error:", err));
+      deleteChatMessages(roomCode).catch(err => console.error("[DB] Chat delete error:", err));
+    });
+
+    socket.on("kick_player", ({ targetIndex }: { targetIndex: number }) => {
+      const found = findBySocket(socket.id);
+      if (!found) return;
+      const result = devRM.kickPlayer(found.room as unknown as devRM.Room, socket.id, targetIndex);
+      if (result.error) { socket.emit("error_msg", { message: result.error }); return; }
+      if (result.targetSocketId) {
+        io.to(result.targetSocketId).emit("you_were_kicked", { message: "Oda sahibi sizi odadan çıkardı." });
+        const s = io.sockets.sockets.get(result.targetSocketId);
+        s?.leave(found.room.code);
+      }
+      saveAsync(found.room);
+      emitAll(io, found.room, found.rm);
+    });
+
+    socket.on("ban_player", ({ targetIndex }: { targetIndex: number }) => {
+      const found = findBySocket(socket.id);
+      if (!found) return;
+      const result = devRM.banPlayer(found.room as unknown as devRM.Room, socket.id, targetIndex);
+      if (result.error) { socket.emit("error_msg", { message: result.error }); return; }
+      if (result.targetSocketId) {
+        io.to(result.targetSocketId).emit("you_were_banned", { message: "Bu odaya giriş yasağı aldınız." });
+        const s = io.sockets.sockets.get(result.targetSocketId);
+        s?.leave(found.room.code);
+      }
+      saveAsync(found.room);
+      emitAll(io, found.room, found.rm);
     });
 
     socket.on("disconnect", (reason) => {

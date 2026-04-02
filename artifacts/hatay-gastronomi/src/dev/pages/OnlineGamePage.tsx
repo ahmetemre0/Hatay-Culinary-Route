@@ -815,11 +815,17 @@ export function OnlineGamePage() {
     myPlayerIndex,
     currentPlayerIndex,
     leaveRoom,
+    permanentLeave,
+    deleteRoom,
+    isHost,
     drawDeckSize,
     onlinePhase,
     roomCode,
     victoryPoints,
   } = useOnlineStore();
+
+  const [showPermanentLeaveConfirm, setShowPermanentLeaveConfirm] = useState(false);
+  const [showDeleteRoomConfirm, setShowDeleteRoomConfirm] = useState(false);
 
   const myPlayer = players[myPlayerIndex];
   const currentPlayer = players[currentPlayerIndex];
@@ -849,6 +855,75 @@ export function OnlineGamePage() {
       <OrientationWarning />
       <OnlineEventModal />
 
+      {/* Permanent Leave Confirmation */}
+      <AnimatePresence>
+        {showPermanentLeaveConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          >
+            <div className="bg-stone-900 border border-red-500/40 rounded-2xl p-6 max-w-xs w-full shadow-2xl">
+              <h3 className="text-white font-bold text-lg mb-2">Tamamen Ayrıl?</h3>
+              <p className="text-white/60 text-sm mb-4">
+                Elindeki kartlar desteye, tamamladığın yemekler havuza geri dönecek. Bu işlem geri alınamaz.
+                {isHost && players.length > 1 && (
+                  <span className="block mt-2 text-amber-300/80">Oda sahipliği başka bir oyuncuya geçecek.</span>
+                )}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowPermanentLeaveConfirm(false)}
+                  className="flex-1 bg-white/10 hover:bg-white/20 text-white py-2 rounded-xl text-sm transition-all"
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={() => { setShowPermanentLeaveConfirm(false); permanentLeave(); }}
+                  className="flex-1 bg-red-500/80 hover:bg-red-500 text-white py-2 rounded-xl text-sm font-semibold transition-all"
+                >
+                  Evet, Ayrıl
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Room Confirmation */}
+      <AnimatePresence>
+        {showDeleteRoomConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          >
+            <div className="bg-stone-900 border border-red-500/40 rounded-2xl p-6 max-w-xs w-full shadow-2xl">
+              <h3 className="text-white font-bold text-lg mb-2">Odayı Sil?</h3>
+              <p className="text-white/60 text-sm mb-4">
+                Tüm oyuncular odadan çıkarılacak ve oyun tamamen silinecek.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteRoomConfirm(false)}
+                  className="flex-1 bg-white/10 hover:bg-white/20 text-white py-2 rounded-xl text-sm transition-all"
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={() => { setShowDeleteRoomConfirm(false); deleteRoom(); leaveRoom(); }}
+                  className="flex-1 bg-red-600/80 hover:bg-red-600 text-white py-2 rounded-xl text-sm font-semibold transition-all"
+                >
+                  Evet, Sil
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <span className="text-2xl">🍽️</span>
@@ -864,6 +939,22 @@ export function OnlineGamePage() {
           <div className="text-white/30 text-xs bg-white/5 rounded-lg px-2 py-1">
             #{roomCode}
           </div>
+          {isHost && (
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowDeleteRoomConfirm(true)}
+              className="px-3 py-2 rounded-xl text-xs text-red-400/60 hover:text-red-400 bg-white/5 hover:bg-red-500/10 transition-all"
+            >
+              🗑 Sil
+            </motion.button>
+          )}
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowPermanentLeaveConfirm(true)}
+            className="px-3 py-2 rounded-xl text-xs text-red-300/60 hover:text-red-300 bg-white/5 hover:bg-red-500/10 transition-all"
+          >
+            ✕ Ayrıl
+          </motion.button>
           <motion.button
             whileTap={{ scale: 0.95 }}
             onClick={leaveRoom}

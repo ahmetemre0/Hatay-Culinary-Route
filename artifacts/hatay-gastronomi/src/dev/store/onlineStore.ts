@@ -96,7 +96,6 @@ function clearUrlRoomCode() {
 
 const urlRoomCode = getRoomCodeFromUrl();
 const savedSession = loadSession();
-const initialRoomCode = urlRoomCode ?? savedSession?.roomCode ?? "";
 const initialPlayerName = savedSession?.playerName ?? "";
 
 type OnlineState = {
@@ -104,6 +103,7 @@ type OnlineState = {
   connected: boolean;
   onlinePhase: OnlinePhase;
   errorMessage: string | null;
+  pendingPermanentLeave: boolean;
 
   playerName: string;
   roomCode: string;
@@ -137,6 +137,12 @@ type OnlineState = {
   joinRoom: (code: string, username?: string) => void;
   startGame: () => void;
   leaveRoom: () => void;
+  permanentLeave: () => void;
+  permanentLeaveFromSession: () => void;
+  deleteRoom: () => void;
+  kickPlayer: (targetIndex: number) => void;
+  banPlayer: (targetIndex: number) => void;
+  rejoinFromSession: () => void;
   drawCard: () => void;
   selectCard: (cardId: string) => void;
   tryComplete: (foodId: string) => void;
@@ -161,9 +167,10 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
   connected: false,
   onlinePhase: "idle",
   errorMessage: null,
+  pendingPermanentLeave: false,
 
   playerName: initialPlayerName,
-  roomCode: initialRoomCode,
+  roomCode: "",
   isHost: false,
   myPlayerIndex: -1,
 
@@ -207,14 +214,29 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
         if (socket.connected) socket.emit("client_ping");
       }, 25000);
 
-      const session = loadSession();
-      const urlRoom = getRoomCodeFromUrl();
-      const roomCode = urlRoom ?? session?.roomCode;
-      const username = session?.username;
-      const playerName = session?.playerName ?? get().playerName;
+      // Auto-rejoin ONLY when actively in a game (not idle), to recover from network drops
+      const state = get();
+      if (state.onlinePhase !== "idle" && state.roomCode) {
+        const session = loadSession();
+        if (session) {
+          socket.emit("rejoin_room", {
+            roomCode: session.roomCode,
+            playerName: session.playerName,
+            username: session.username,
+          });
+        }
+      }
 
-      if (roomCode && (username || playerName)) {
-        socket.emit("rejoin_room", { roomCode, playerName: playerName, username });
+      // If pendingPermanentLeave, reconnect and then send permanent_leave
+      if (state.pendingPermanentLeave) {
+        const session = loadSession();
+        if (session) {
+          socket.emit("rejoin_room", {
+            roomCode: session.roomCode,
+            playerName: session.playerName,
+            username: session.username,
+          });
+        }
       }
     });
 
@@ -229,10 +251,18 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     });
 
     socket.on("room_joined", ({ roomCode, version }: { roomCode: string; version?: "stable" | "dev" }) => {
-      const { playerName } = get();
+      const { playerName, pendingPermanentLeave } = get();
       const session = loadSession();
       saveSession(roomCode, session?.username ?? "", playerName);
       setUrlRoomCode(roomCode);
+
+      // If we rejoined just to permanently leave, emit permanent_leave immediately
+      if (pendingPermanentLeave) {
+        set({ pendingPermanentLeave: false });
+        socket.emit("permanent_leave");
+        return;
+      }
+
       set({ roomCode, onlinePhase: "waiting_room" });
       if (version && version !== "dev") {
         useVersionStore.getState().setVersion(version);
@@ -240,10 +270,25 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     });
 
     socket.on("rejoin_ok", () => {
+      const { pendingPermanentLeave } = get();
+      if (pendingPermanentLeave) {
+        set({ pendingPermanentLeave: false });
+        socket.emit("permanent_leave");
+        return;
+      }
       set({ errorMessage: null });
     });
 
     socket.on("rejoin_failed", ({ message }: { message: string }) => {
+      const { pendingPermanentLeave } = get();
+      if (pendingPermanentLeave) {
+        // Couldn't rejoin (room gone), just clear session
+        set({ pendingPermanentLeave: false });
+        clearSession();
+        clearUrlRoomCode();
+        set({ errorMessage: null, onlinePhase: "idle", roomCode: "" });
+        return;
+      }
       clearSession();
       clearUrlRoomCode();
       set({ errorMessage: message, onlinePhase: "idle", roomCode: "" });
@@ -251,6 +296,17 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
 
     socket.on("game_state", (view: PlayerView) => {
       const state = get();
+
+      // If user intentionally left or is pending permanent leave, ignore incoming game state
+      if (state.onlinePhase === "idle") return;
+
+      const { pendingPermanentLeave } = get();
+      if (pendingPermanentLeave) {
+        set({ pendingPermanentLeave: false });
+        socket.emit("permanent_leave");
+        return;
+      }
+
       const isHost = socket.id === view.hostSocketId;
 
       let onlinePhase: OnlinePhase = "waiting_room";
@@ -290,6 +346,67 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
 
     socket.on("error_msg", ({ message }: { message: string }) => {
       set({ errorMessage: message });
+    });
+
+    socket.on("you_left_permanently", () => {
+      clearSession();
+      clearUrlRoomCode();
+      set({
+        pendingPermanentLeave: false,
+        onlinePhase: "idle",
+        roomCode: "",
+        isHost: false,
+        players: [],
+        myHand: [],
+        messages: [],
+        chatMessages: [],
+        errorMessage: null,
+      });
+    });
+
+    socket.on("room_deleted", ({ message }: { message: string }) => {
+      clearSession();
+      clearUrlRoomCode();
+      set({
+        onlinePhase: "idle",
+        roomCode: "",
+        isHost: false,
+        players: [],
+        myHand: [],
+        messages: [],
+        chatMessages: [],
+        errorMessage: message,
+      });
+    });
+
+    socket.on("you_were_kicked", ({ message }: { message: string }) => {
+      clearSession();
+      clearUrlRoomCode();
+      set({
+        onlinePhase: "idle",
+        roomCode: "",
+        isHost: false,
+        players: [],
+        myHand: [],
+        messages: [],
+        chatMessages: [],
+        errorMessage: message,
+      });
+    });
+
+    socket.on("you_were_banned", ({ message }: { message: string }) => {
+      clearSession();
+      clearUrlRoomCode();
+      set({
+        onlinePhase: "idle",
+        roomCode: "",
+        isHost: false,
+        players: [],
+        myHand: [],
+        messages: [],
+        chatMessages: [],
+        errorMessage: message,
+      });
     });
 
     socket.on("chat_history", (history: Array<{ id: number; playerName: string; text: string; timestamp: number }>) => {
@@ -358,10 +475,60 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
   startGame: () => { get().socket?.emit("start_game"); },
 
   leaveRoom: () => {
+    // Set idle FIRST so game_state events get ignored
+    set({ onlinePhase: "idle", roomCode: "", isHost: false, players: [], myHand: [], messages: [], chatMessages: [] });
     get().socket?.emit("leave_room");
     clearSession();
     clearUrlRoomCode();
+  },
+
+  permanentLeave: () => {
+    const { socket } = get();
     set({ onlinePhase: "idle", roomCode: "", isHost: false, players: [], myHand: [], messages: [], chatMessages: [] });
+    clearSession();
+    clearUrlRoomCode();
+    socket?.emit("permanent_leave");
+  },
+
+  permanentLeaveFromSession: () => {
+    const session = loadSession();
+    if (!session) return;
+    const { socket, connected } = get();
+    set({ pendingPermanentLeave: true });
+    if (connected && socket?.connected) {
+      socket.emit("rejoin_room", {
+        roomCode: session.roomCode,
+        playerName: session.playerName,
+        username: session.username,
+      });
+    }
+    // If not connected, the connect handler will handle it when the socket reconnects
+  },
+
+  deleteRoom: () => {
+    const { socket } = get();
+    socket?.emit("delete_room");
+  },
+
+  kickPlayer: (targetIndex: number) => {
+    get().socket?.emit("kick_player", { targetIndex });
+  },
+
+  banPlayer: (targetIndex: number) => {
+    get().socket?.emit("ban_player", { targetIndex });
+  },
+
+  rejoinFromSession: () => {
+    const session = loadSession();
+    if (!session) return;
+    const { socket, connected } = get();
+    if (!connected || !socket?.connected) return;
+    set({ playerName: session.playerName });
+    socket.emit("rejoin_room", {
+      roomCode: session.roomCode,
+      playerName: session.playerName,
+      username: session.username,
+    });
   },
 
   drawCard: () => { get().socket?.emit("draw_card"); },
@@ -417,6 +584,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     clearUrlRoomCode();
     set({
       socket: null, connected: false, onlinePhase: "idle", errorMessage: null,
+      pendingPermanentLeave: false,
       playerName: "", roomCode: "", isHost: false, myPlayerIndex: -1,
       players: [], myHand: [], currentPlayerIndex: 0,
       marketFoods: [], drawDeckSize: 0, discardPileSize: 0, foodDeckSize: 0,
@@ -426,6 +594,10 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     });
   },
 }));
+
+export function getActiveSession(): { roomCode: string; username: string; playerName: string } | null {
+  return loadSession();
+}
 
 export function persistSession(roomCode: string, playerName: string) {
   saveSession(roomCode, "", playerName);

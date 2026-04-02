@@ -38,6 +38,7 @@ export type ServerGameState = {
   cookingAnimation: string | null;
   doubledMarketFoodIds: string[];
   victoryPoints: number;
+  bannedUsernames: string[];
 };
 
 export type Room = {
@@ -70,6 +71,7 @@ function makeInitialState(): ServerGameState {
     cookingAnimation: null,
     doubledMarketFoodIds: [],
     victoryPoints: 31,
+    bannedUsernames: [],
   };
 }
 
@@ -111,6 +113,9 @@ export function joinRoom(socketId: string, code: string, playerName: string, use
   if (room.state.players.some(p => p.socketId === socketId)) return { room, error: undefined };
 
   const uname = username ?? playerName;
+  if ((room.state.bannedUsernames ?? []).includes(uname)) {
+    return { room: null!, error: "Bu odadan engellendiniz!" };
+  }
   if (room.state.players.some(p => p.username === uname)) {
     return { room: null!, error: "Bu kullanıcı adı odada zaten var!" };
   }
@@ -145,6 +150,9 @@ export function rejoinRoom(newSocketId: string, code: string, playerNameOrUserna
   if (!room) return { room: null, error: "Oda bulunamadı!" };
 
   const uname = username ?? playerNameOrUsername;
+  if ((room.state.bannedUsernames ?? []).includes(uname)) {
+    return { room: null, error: "Bu odadan engellendiniz!" };
+  }
 
   let pIdx = room.state.players.findIndex(p => p.username === uname);
   if (pIdx === -1) {
@@ -211,6 +219,103 @@ export function removePlayer(socketId: string): { room: Room | null; wasHost: bo
   }
 
   return { room, wasHost, playerName };
+}
+
+export function permanentLeavePlayer(socketId: string): { room: Room | null; wasHost: boolean; playerName: string } {
+  const room = getRoomBySocket(socketId);
+  if (!room) return { room: null, wasHost: false, playerName: "" };
+
+  const pIdx = room.state.players.findIndex(p => p.socketId === socketId);
+  if (pIdx === -1) return { room: null, wasHost: false, playerName: "" };
+
+  const player = room.state.players[pIdx];
+  const playerName = player.name;
+  const wasHost = room.hostSocketId === socketId;
+
+  socketToRoom.delete(socketId);
+
+  if (room.state.phase === "lobby") {
+    room.state.players = room.state.players.filter((_, i) => i !== pIdx);
+    if (room.state.players.length === 0) {
+      rooms.delete(room.code);
+      return { room: null, wasHost, playerName };
+    }
+    if (wasHost) room.hostSocketId = room.state.players[0].socketId;
+    addMessage(room.state, `${playerName} odadan tamamen ayrıldı`, "warning");
+  } else {
+    room.state.drawDeck = shuffle([...room.state.drawDeck, ...player.hand]);
+    room.state.foodDeck = [...room.state.foodDeck, ...player.scoredFoods];
+
+    const originalCurrentIdx = room.state.currentPlayerIndex;
+    room.state.players = room.state.players.filter((_, i) => i !== pIdx);
+
+    if (room.state.players.length === 0) {
+      rooms.delete(room.code);
+      return { room: null, wasHost, playerName };
+    }
+    if (room.state.players.length === 1) {
+      room.state.phase = "game_over";
+      room.state.winnerIndex = 0;
+      addMessage(room.state, `🏆 ${room.state.players[0].name} kazandı! (Tek oyuncu kaldı)`, "success");
+    } else {
+      if (pIdx < originalCurrentIdx) {
+        room.state.currentPlayerIndex = originalCurrentIdx - 1;
+      } else if (pIdx === originalCurrentIdx) {
+        room.state.currentPlayerIndex = pIdx % room.state.players.length;
+        room.state.hasDrawnThisTurn = false;
+        room.state.canEndTurn = false;
+        if (room.state.phase === "event_pending") {
+          room.state.phase = "playing";
+          room.state.pendingEvent = null;
+        }
+        addMessage(room.state, `${room.state.players[room.state.currentPlayerIndex].name}'ın sırası`, "info");
+      }
+    }
+    if (wasHost && room.state.players.length > 0) {
+      room.hostSocketId = room.state.players[0].socketId;
+      addMessage(room.state, `${room.state.players[0].name} yeni oda sahibi oldu`, "info");
+    }
+    addMessage(room.state, `${playerName} oyundan tamamen ayrıldı. Kartlar desteye, yemekler havuza döndü.`, "warning");
+  }
+  return { room, wasHost, playerName };
+}
+
+export function kickPlayer(room: Room, hostSocketId: string, targetIndex: number): { targetSocketId: string | null; error?: string } {
+  if (room.hostSocketId !== hostSocketId) return { targetSocketId: null, error: "Sadece oda sahibi oyuncu atabilir!" };
+  if (room.state.phase !== "lobby") return { targetSocketId: null, error: "Oyuncu atma sadece lobide yapılabilir!" };
+  const target = room.state.players[targetIndex];
+  if (!target) return { targetSocketId: null, error: "Oyuncu bulunamadı!" };
+  if (target.socketId === hostSocketId) return { targetSocketId: null, error: "Kendinizi atamazsınız!" };
+
+  const targetSocketId = target.socketId;
+  room.state.players = room.state.players.filter((_, i) => i !== targetIndex);
+  socketToRoom.delete(targetSocketId);
+  addMessage(room.state, `${target.name} odadan çıkarıldı`, "warning");
+  return { targetSocketId };
+}
+
+export function banPlayer(room: Room, hostSocketId: string, targetIndex: number): { targetSocketId: string | null; error?: string } {
+  if (room.hostSocketId !== hostSocketId) return { targetSocketId: null, error: "Sadece oda sahibi oyuncu engelleyebilir!" };
+  if (room.state.phase !== "lobby") return { targetSocketId: null, error: "Engelleme sadece lobide yapılabilir!" };
+  const target = room.state.players[targetIndex];
+  if (!target) return { targetSocketId: null, error: "Oyuncu bulunamadı!" };
+  if (target.socketId === hostSocketId) return { targetSocketId: null, error: "Kendinizi engelleyemezsiniz!" };
+
+  const targetSocketId = target.socketId;
+  room.state.bannedUsernames = [...(room.state.bannedUsernames ?? []), target.username];
+  room.state.players = room.state.players.filter((_, i) => i !== targetIndex);
+  socketToRoom.delete(targetSocketId);
+  addMessage(room.state, `${target.name} odadan engellendi`, "warning");
+  return { targetSocketId };
+}
+
+export function destroyRoom(code: string): string[] {
+  const room = rooms.get(code.toUpperCase());
+  if (!room) return [];
+  const socketIds = room.state.players.map(p => p.socketId);
+  socketIds.forEach(sid => socketToRoom.delete(sid));
+  rooms.delete(code.toUpperCase());
+  return socketIds;
 }
 
 export function startGame(room: Room): string | null {
