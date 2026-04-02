@@ -1,3 +1,4 @@
+import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { GameCard } from "./GameCard";
 import { useGameStore } from "../store/gameStore";
@@ -22,6 +23,13 @@ export function MarketArea() {
   } = useGameStore();
 
   const current = players[currentPlayerIndex];
+  const [isDrawing, setIsDrawing] = React.useState(false);
+
+  const handleDrawWithAnimation = () => {
+    setIsDrawing(true);
+    drawCard();
+    setTimeout(() => setIsDrawing(false), 800);
+  };
 
   function selectionMatchesFood(foodId: string): "match" | "mismatch" | "none" {
     if (selectedCards.length === 0) return "none";
@@ -46,12 +54,12 @@ export function MarketArea() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex gap-4 justify-center items-start flex-wrap">
-        <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-col items-center gap-2 relative">
           <div className="text-white/60 text-xs font-medium uppercase tracking-wider">Deste</div>
           <motion.div
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.97 }}
-            onClick={phase === "playing" && !hasDrawnThisTurn ? drawCard : undefined}
+            onClick={phase === "playing" && !hasDrawnThisTurn ? handleDrawWithAnimation : undefined}
             className={cn(
               "w-28 h-40 rounded-xl border-2 bg-gradient-to-br from-slate-700 to-slate-900 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all",
               !hasDrawnThisTurn && phase === "playing"
@@ -65,6 +73,20 @@ export function MarketArea() {
               <span className="text-blue-300 text-[10px] font-medium animate-pulse">Çek!</span>
             )}
           </motion.div>
+          <AnimatePresence>
+            {isDrawing && (
+              <motion.div
+                key="draw-animation"
+                initial={{ y: 0, x: 0, opacity: 1, rotate: 0 }}
+                animate={{ y: 200, x: 0, opacity: 0, rotate: 45 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.6, ease: "easeIn" }}
+                className="absolute top-0 w-20 h-28 rounded-lg border-2 border-blue-400 bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center text-2xl pointer-events-none"
+              >
+                🎴
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         <div className="flex flex-col gap-2">
