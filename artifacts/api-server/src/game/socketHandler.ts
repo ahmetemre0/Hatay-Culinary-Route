@@ -1,7 +1,7 @@
 import { Server, Socket } from "socket.io";
 import * as stableRM from "./roomManager.js";
 import * as devRM from "./dev/roomManager.js";
-import { saveRoom, loadRoom, deleteRoom } from "./db.js";
+import { saveRoom, loadRoom, deleteRoom, registerDevUser, loginDevUser } from "./db.js";
 
 type RM = typeof stableRM;
 type Room = stableRM.Room;
@@ -72,29 +72,87 @@ export function setupSocketHandler(io: Server) {
       socket.emit("server_pong");
     });
 
-    socket.on("create_room", ({ playerName, version }: { playerName: string; version?: "stable" | "dev" }) => {
+    socket.on("dev_auth_register", async ({ username, password, displayName }: { username: string; password: string; displayName?: string }) => {
       try {
-        const rm = getRMForVersion(version ?? "stable");
-        const room = rm.createRoom(socket.id, playerName) as unknown as Room;
+        const result = await registerDevUser(username, password, displayName);
+        if (!result.success) {
+          socket.emit("dev_auth_error", { message: result.error ?? "Kayıt başarısız!" });
+          return;
+        }
+        socket.emit("dev_auth_ok", { displayName: displayName?.trim() || username });
+      } catch (err) {
+        socket.emit("dev_auth_error", { message: "Sunucu hatası!" });
+      }
+    });
+
+    socket.on("dev_auth_login", async ({ username, password }: { username: string; password: string }) => {
+      try {
+        const result = await loginDevUser(username, password);
+        if (!result.success) {
+          socket.emit("dev_auth_error", { message: result.error ?? "Giriş başarısız!" });
+          return;
+        }
+        socket.emit("dev_auth_ok", { displayName: result.displayName ?? username });
+      } catch (err) {
+        socket.emit("dev_auth_error", { message: "Sunucu hatası!" });
+      }
+    });
+
+    socket.on("check_room_version", async ({ roomCode }: { roomCode: string }) => {
+      try {
+        const found = await resolveRoom(roomCode.toUpperCase());
+        if (!found) {
+          socket.emit("room_version_result", { version: null, error: "Oda bulunamadı!" });
+          return;
+        }
+        socket.emit("room_version_result", { version: found.room.state.version });
+      } catch (err) {
+        socket.emit("room_version_result", { version: null, error: "Hata oluştu!" });
+      }
+    });
+
+    socket.on("create_room", ({ playerName, version, username }: { playerName: string; version?: "stable" | "dev"; username?: string }) => {
+      try {
+        const ver = version ?? "stable";
+        let room: Room;
+        if (ver === "dev") {
+          room = devRM.createRoom(socket.id, playerName, username) as unknown as Room;
+        } else {
+          room = stableRM.createRoom(socket.id, playerName) as unknown as Room;
+        }
         socket.join(room.code);
         socket.emit("room_created", { roomCode: room.code });
-        socket.emit("room_joined", { roomCode: room.code });
+        socket.emit("room_joined", { roomCode: room.code, version: room.state.version });
         saveAsync(room);
+        const rm = getRMForVersion(ver);
         emitAll(io, room, rm);
       } catch (e) {
         socket.emit("error_msg", { message: String(e) });
       }
     });
 
-    socket.on("join_room", ({ roomCode, playerName }: { roomCode: string; playerName: string }) => {
+    socket.on("join_room", ({ roomCode, playerName, username }: { roomCode: string; playerName: string; username?: string }) => {
       try {
         const found = findByCode(roomCode.toUpperCase());
         if (!found) { socket.emit("error_msg", { message: "Oda bulunamadı!" }); return; }
         const { room: existingRoom, rm } = found;
-        const { room, error } = rm.joinRoom(socket.id, existingRoom.code, playerName) as { room: Room; error: string | null };
-        if (error) { socket.emit("error_msg", { message: error }); return; }
+
+        let room: Room;
+        let error: string | null;
+
+        if (existingRoom.state.version === "dev") {
+          const result = devRM.joinRoom(socket.id, existingRoom.code, playerName, username) as { room: Room; error?: string };
+          room = result.room;
+          error = result.error ?? null;
+        } else {
+          const result = stableRM.joinRoom(socket.id, existingRoom.code, playerName) as { room: Room; error?: string };
+          room = result.room;
+          error = result.error ?? null;
+        }
+
+        if (error || !room) { socket.emit("error_msg", { message: error ?? "Odaya katılınamadı!" }); return; }
         socket.join(room.code);
-        socket.emit("room_joined", { roomCode: room.code });
+        socket.emit("room_joined", { roomCode: room.code, version: room.state.version });
         saveAsync(room);
         emitAll(io, room, rm);
       } catch (e) {
@@ -184,7 +242,7 @@ export function setupSocketHandler(io: Server) {
       emitAll(io, room, rm);
     });
 
-    socket.on("rejoin_room", async ({ roomCode, playerName }: { roomCode: string; playerName: string }) => {
+    socket.on("rejoin_room", async ({ roomCode, playerName, username }: { roomCode: string; playerName: string; username?: string }) => {
       try {
         const resolved = await resolveRoom(roomCode);
         if (!resolved) {
@@ -198,7 +256,19 @@ export function setupSocketHandler(io: Server) {
           return;
         }
 
-        const { room: rejoined, error } = rm.rejoinRoom(socket.id, roomCode, playerName) as { room: Room; error: string | null };
+        let rejoined: Room;
+        let error: string | null;
+
+        if (foundRoom.state.version === "dev") {
+          const result = devRM.rejoinRoom(socket.id, roomCode, playerName, username) as { room: Room | null; error?: string };
+          rejoined = result.room!;
+          error = result.error ?? null;
+        } else {
+          const result = stableRM.rejoinRoom(socket.id, roomCode, playerName) as { room: Room | null; error?: string };
+          rejoined = result.room!;
+          error = result.error ?? null;
+        }
+
         if (error || !rejoined) {
           socket.emit("rejoin_failed", { message: error ?? "Yeniden bağlanılamadı!" });
           return;
@@ -207,7 +277,7 @@ export function setupSocketHandler(io: Server) {
         socket.join(rejoined.code);
         const isNewJoin = rejoined.state.phase === "lobby";
         if (isNewJoin) {
-          socket.emit("room_joined", { roomCode: rejoined.code });
+          socket.emit("room_joined", { roomCode: rejoined.code, version: rejoined.state.version });
         } else {
           socket.emit("rejoin_ok");
         }

@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useVersionStore } from "./store/versionStore";
 
 import { useGameStore } from "./store/gameStore";
 import { useOnlineStore } from "./store/onlineStore";
@@ -18,6 +17,9 @@ import { GameOverPage as DevGameOverPage } from "./dev/pages/GameOverPage";
 import { LobbyPage as DevLobbyPage } from "./dev/pages/LobbyPage";
 import { OnlineGamePage as DevOnlineGamePage } from "./dev/pages/OnlineGamePage";
 import { OnlineGameOverPage as DevOnlineGameOverPage } from "./dev/pages/OnlineGameOverPage";
+
+import { useState } from "react";
+import { motion } from "framer-motion";
 
 type GameMode = "select" | "local" | "online";
 type Version = "stable" | "dev";
@@ -54,17 +56,15 @@ function VersionSwitcher({ version, onChange }: { version: Version; onChange: (v
 function ModeSelectPage({
   onSelectLocal,
   onSelectOnline,
-  version,
-  onVersionChange,
 }: {
   onSelectLocal: () => void;
   onSelectOnline: () => void;
-  version: Version;
-  onVersionChange: (v: Version) => void;
 }) {
+  const { version, setVersion } = useVersionStore();
+
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-amber-900 via-red-900 to-stone-900 flex items-center justify-center p-4">
-      <VersionSwitcher version={version} onChange={onVersionChange} />
+      <VersionSwitcher version={version} onChange={setVersion} />
 
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
@@ -186,7 +186,7 @@ function DevGame({ mode, onBack }: { mode: Exclude<GameMode, "select">; onBack: 
 }
 
 function App() {
-  const [version, setVersion] = useState<Version>("stable");
+  const { version } = useVersionStore();
   const [mode, setMode] = useState<GameMode>(getInitialMode);
 
   const goToSelect = () => setMode("select");
@@ -194,8 +194,6 @@ function App() {
   if (mode === "select") {
     return (
       <ModeSelectPage
-        version={version}
-        onVersionChange={setVersion}
         onSelectLocal={() => setMode("local")}
         onSelectOnline={() => setMode("online")}
       />

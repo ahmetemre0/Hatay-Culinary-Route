@@ -1,6 +1,10 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useOnlineStore } from "../store/onlineStore";
+import { useAuthStore } from "../store/authStore";
+import { useVersionStore } from "../../store/versionStore";
+import { setPendingJoin, takePendingJoin } from "../../store/pendingJoin";
+import { DevAuthPage } from "./DevAuthPage";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -30,28 +34,77 @@ export function LobbyPage({ onBack }: Props) {
     startGame,
     leaveRoom,
     clearError,
+    checkRoomVersion,
   } = useOnlineStore();
+
+  const { isAuthenticated, username, displayName, setDisplayName, logout } = useAuthStore();
+  const { setVersion } = useVersionStore();
 
   const urlRoomCode = getRoomCodeFromUrl();
   const [joinCode, setJoinCode] = useState(urlRoomCode);
   const [tab, setTab] = useState<"create" | "join">(urlRoomCode ? "join" : "create");
-  const [localName, setLocalName] = useState(playerName || "");
+  const [localDisplayName, setLocalDisplayName] = useState(displayName || username || "");
   const [copied, setCopied] = useState(false);
+  const [checkingVersion, setCheckingVersion] = useState(false);
 
   useEffect(() => {
     connect();
   }, []);
 
+  useEffect(() => {
+    if (isAuthenticated && (displayName || username)) {
+      setLocalDisplayName(displayName || username);
+    }
+  }, [isAuthenticated, displayName, username]);
+
+  useEffect(() => {
+    const pending = takePendingJoin();
+    if (pending && connected && isAuthenticated) {
+      const nameToUse = pending.playerName || localDisplayName || username;
+      useOnlineStore.setState({ playerName: nameToUse });
+      setPlayerName(nameToUse);
+      joinRoom(pending.roomCode, username);
+    }
+  }, [connected, isAuthenticated]);
+
+  if (!isAuthenticated) {
+    return <DevAuthPage onBack={onBack} />;
+  }
+
+  const effectiveName = localDisplayName.trim() || username;
+
+  const handleSaveDisplayName = () => {
+    if (localDisplayName.trim() && localDisplayName.trim() !== displayName) {
+      setDisplayName(localDisplayName.trim());
+    }
+  };
+
   const handleCreate = () => {
-    setPlayerName(localName);
-    useOnlineStore.setState({ playerName: localName });
-    createRoom();
+    const name = effectiveName;
+    useOnlineStore.setState({ playerName: name });
+    setPlayerName(name);
+    createRoom(username);
   };
 
   const handleJoin = () => {
-    useOnlineStore.setState({ playerName: localName });
-    setPlayerName(localName);
-    joinRoom(joinCode);
+    if (!joinCode.trim() || !connected) return;
+    setCheckingVersion(true);
+    checkRoomVersion(joinCode, (version) => {
+      setCheckingVersion(false);
+      if (version === null) {
+        useOnlineStore.setState({ errorMessage: "Oda bulunamadı!" });
+        return;
+      }
+      if (version === "stable") {
+        setPendingJoin({ roomCode: joinCode, playerName: effectiveName });
+        setVersion("stable");
+        return;
+      }
+      const name = effectiveName;
+      useOnlineStore.setState({ playerName: name });
+      setPlayerName(name);
+      joinRoom(joinCode, username);
+    });
   };
 
   const handleBack = () => {
@@ -62,12 +115,12 @@ export function LobbyPage({ onBack }: Props) {
   const isWaiting = onlinePhase === "waiting_room";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-900 via-red-900 to-stone-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-violet-900 via-purple-900 to-stone-900 flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ type: "spring", stiffness: 200, damping: 20 }}
-        className="bg-black/40 backdrop-blur-md rounded-3xl p-8 max-w-md w-full border border-white/10 shadow-2xl"
+        className="bg-black/40 backdrop-blur-md rounded-3xl p-8 max-w-md w-full border border-violet-500/20 shadow-2xl"
       >
         <div className="flex items-center justify-between mb-6">
           <button
@@ -76,16 +129,24 @@ export function LobbyPage({ onBack }: Props) {
           >
             ← Geri
           </button>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <div className={cn("w-2 h-2 rounded-full", connected ? "bg-green-400 animate-pulse" : "bg-red-400")} />
             <span className="text-white/50 text-xs">{connected ? "Bağlandı" : "Bağlanıyor..."}</span>
+            <button
+              onClick={logout}
+              className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
+            >
+              çıkış
+            </button>
           </div>
         </div>
 
         <div className="text-center mb-6">
           <div className="text-5xl mb-3">🌐</div>
           <h1 className="text-2xl font-bold text-white">Online Oyun</h1>
-          <p className="text-amber-300 text-sm mt-1">Oda kodu ile arkadaşlarınla oyna</p>
+          <p className="text-violet-300 text-sm mt-1">
+            <span className="text-violet-400 font-semibold">{username}</span> olarak oynuyorsun
+          </p>
         </div>
 
         <AnimatePresence>
@@ -105,14 +166,21 @@ export function LobbyPage({ onBack }: Props) {
         {!isWaiting ? (
           <div className="space-y-4">
             <div>
-              <label className="text-white/70 text-sm font-medium block mb-1.5">İsmin</label>
-              <input
-                value={localName}
-                onChange={(e) => setLocalName(e.target.value)}
-                className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-white/30 focus:outline-none focus:border-amber-400 transition-all"
-                placeholder="Oyuncu adını gir..."
-                maxLength={20}
-              />
+              <label className="text-white/70 text-sm font-medium block mb-1.5">
+                Görünen İsim
+                <span className="text-white/40 text-xs ml-1">(boş bırakırsan kullanıcı adın kullanılır)</span>
+              </label>
+              <div className="flex gap-2">
+                <input
+                  value={localDisplayName}
+                  onChange={(e) => setLocalDisplayName(e.target.value)}
+                  onBlur={handleSaveDisplayName}
+                  className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-white/30 focus:outline-none focus:border-violet-400 transition-all"
+                  placeholder={username}
+                  maxLength={20}
+                />
+              </div>
+              <p className="text-white/30 text-xs mt-1">Oyunda gözükecek isim: <strong className="text-white/50">{effectiveName}</strong></p>
             </div>
 
             <div className="flex gap-2">
@@ -121,7 +189,7 @@ export function LobbyPage({ onBack }: Props) {
                 className={cn(
                   "flex-1 py-2 rounded-xl font-semibold text-sm transition-all",
                   tab === "create"
-                    ? "bg-amber-500 text-black"
+                    ? "bg-violet-500 text-white"
                     : "bg-white/10 text-white/60 hover:bg-white/20"
                 )}
               >
@@ -132,7 +200,7 @@ export function LobbyPage({ onBack }: Props) {
                 className={cn(
                   "flex-1 py-2 rounded-xl font-semibold text-sm transition-all",
                   tab === "join"
-                    ? "bg-amber-500 text-black"
+                    ? "bg-violet-500 text-white"
                     : "bg-white/10 text-white/60 hover:bg-white/20"
                 )}
               >
@@ -147,9 +215,9 @@ export function LobbyPage({ onBack }: Props) {
                 animate={{ opacity: 1 }}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                disabled={!localName.trim() || !connected}
+                disabled={!connected}
                 onClick={handleCreate}
-                className="w-full bg-gradient-to-r from-amber-500 to-red-500 text-white font-bold py-3.5 rounded-xl shadow-lg disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-bold py-3.5 rounded-xl shadow-lg disabled:opacity-40 disabled:cursor-not-allowed transition-all"
               >
                 🏠 Oda Oluştur
               </motion.button>
@@ -163,26 +231,26 @@ export function LobbyPage({ onBack }: Props) {
                 <input
                   value={joinCode}
                   onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                  className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-white/30 focus:outline-none focus:border-amber-400 transition-all text-center text-lg tracking-widest font-bold uppercase"
+                  className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-white/30 focus:outline-none focus:border-violet-400 transition-all text-center text-lg tracking-widest font-bold uppercase"
                   placeholder="ODA KODU"
                   maxLength={8}
                 />
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  disabled={!localName.trim() || !joinCode.trim() || !connected}
+                  disabled={!joinCode.trim() || !connected || checkingVersion}
                   onClick={handleJoin}
                   className="w-full bg-gradient-to-r from-teal-500 to-blue-600 text-white font-bold py-3.5 rounded-xl shadow-lg disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                 >
-                  🔑 Odaya Katıl
+                  {checkingVersion ? "⏳ Kontrol ediliyor..." : "🔑 Odaya Katıl"}
                 </motion.button>
               </motion.div>
             )}
 
-            <div className="bg-white/5 rounded-xl p-3 text-xs text-white/50 space-y-1">
+            <div className="bg-violet-500/10 rounded-xl p-3 text-xs text-violet-300/60 space-y-1">
               <p>👥 2-4 oyuncu gerekli</p>
+              <p>🔄 Bağlantı kesilse farklı cihazdan aynı odaya geri dönebilirsin</p>
               <p>🎲 Oda sahibi oyunu başlatır</p>
-              <p>🎴 Herkes kendi kartlarını görür</p>
             </div>
           </div>
         ) : (
@@ -191,9 +259,9 @@ export function LobbyPage({ onBack }: Props) {
             animate={{ opacity: 1 }}
             className="space-y-4"
           >
-            <div className="bg-amber-500/20 border border-amber-400/50 rounded-2xl p-4 text-center">
+            <div className="bg-violet-500/20 border border-violet-400/50 rounded-2xl p-4 text-center">
               <div className="text-white/60 text-xs uppercase tracking-widest mb-1">Oda Kodu</div>
-              <div className="text-4xl font-bold text-amber-300 tracking-widest">{roomCode}</div>
+              <div className="text-4xl font-bold text-violet-300 tracking-widest">{roomCode}</div>
               <button
                 onClick={() => {
                   const url = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
@@ -224,7 +292,7 @@ export function LobbyPage({ onBack }: Props) {
                     <div className="w-2 h-2 rounded-full bg-green-400" />
                     <span className="text-white text-sm">{p.name}</span>
                     {i === 0 && (
-                      <span className="text-amber-400 text-xs ml-auto">👑 Oda Sahibi</span>
+                      <span className="text-violet-400 text-xs ml-auto">👑 Oda Sahibi</span>
                     )}
                   </motion.div>
                 ))}
@@ -245,7 +313,7 @@ export function LobbyPage({ onBack }: Props) {
                 whileTap={{ scale: 0.98 }}
                 disabled={players.length < 2}
                 onClick={startGame}
-                className="w-full bg-gradient-to-r from-amber-500 to-red-500 text-white font-bold py-4 rounded-xl shadow-lg disabled:opacity-40 disabled:cursor-not-allowed text-lg"
+                className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white font-bold py-4 rounded-xl shadow-lg disabled:opacity-40 disabled:cursor-not-allowed text-lg"
               >
                 🚀 Oyunu Başlat! ({players.length} Oyuncu)
               </motion.button>

@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useOnlineStore } from "../store/onlineStore";
+import { useVersionStore } from "../store/versionStore";
+import { setPendingJoin, takePendingJoin } from "../store/pendingJoin";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -30,17 +32,32 @@ export function LobbyPage({ onBack }: Props) {
     startGame,
     leaveRoom,
     clearError,
+    checkRoomVersion,
   } = useOnlineStore();
+
+  const { setVersion } = useVersionStore();
 
   const urlRoomCode = getRoomCodeFromUrl();
   const [joinCode, setJoinCode] = useState(urlRoomCode);
   const [tab, setTab] = useState<"create" | "join">(urlRoomCode ? "join" : "create");
   const [localName, setLocalName] = useState(playerName || "");
   const [copied, setCopied] = useState(false);
+  const [checkingVersion, setCheckingVersion] = useState(false);
 
   useEffect(() => {
     connect();
   }, []);
+
+  useEffect(() => {
+    const pending = takePendingJoin();
+    if (pending && connected) {
+      const name = pending.playerName || localName;
+      useOnlineStore.setState({ playerName: name });
+      setPlayerName(name);
+      setLocalName(name);
+      joinRoom(pending.roomCode);
+    }
+  }, [connected]);
 
   const handleCreate = () => {
     setPlayerName(localName);
@@ -49,9 +66,23 @@ export function LobbyPage({ onBack }: Props) {
   };
 
   const handleJoin = () => {
-    useOnlineStore.setState({ playerName: localName });
-    setPlayerName(localName);
-    joinRoom(joinCode);
+    if (!joinCode.trim() || !localName.trim() || !connected) return;
+    setCheckingVersion(true);
+    checkRoomVersion(joinCode, (version) => {
+      setCheckingVersion(false);
+      if (version === null) {
+        useOnlineStore.setState({ errorMessage: "Oda bulunamadı!" });
+        return;
+      }
+      if (version === "dev") {
+        setPendingJoin({ roomCode: joinCode, playerName: localName });
+        setVersion("dev");
+        return;
+      }
+      useOnlineStore.setState({ playerName: localName });
+      setPlayerName(localName);
+      joinRoom(joinCode);
+    });
   };
 
   const handleBack = () => {
@@ -170,11 +201,11 @@ export function LobbyPage({ onBack }: Props) {
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  disabled={!localName.trim() || !joinCode.trim() || !connected}
+                  disabled={!localName.trim() || !joinCode.trim() || !connected || checkingVersion}
                   onClick={handleJoin}
                   className="w-full bg-gradient-to-r from-teal-500 to-blue-600 text-white font-bold py-3.5 rounded-xl shadow-lg disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                 >
-                  🔑 Odaya Katıl
+                  {checkingVersion ? "⏳ Kontrol ediliyor..." : "🔑 Odaya Katıl"}
                 </motion.button>
               </motion.div>
             )}

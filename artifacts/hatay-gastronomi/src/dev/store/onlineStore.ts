@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { io, Socket } from "socket.io-client";
 import { Card, EventCard, FoodCard } from "../data/cards";
+import { useVersionStore } from "../../store/versionStore";
 
 export type OnlineMessage = {
   id: number;
@@ -46,13 +47,13 @@ export type PlayerView = {
   victoryPoints: number;
 };
 
-const SESSION_KEY = "hatay_game_session";
+const SESSION_KEY = "hatay_dev_game_session";
 
-function saveSession(roomCode: string, playerName: string) {
-  try { localStorage.setItem(SESSION_KEY, JSON.stringify({ roomCode, playerName })); } catch {}
+function saveSession(roomCode: string, username: string, playerName: string) {
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify({ roomCode, username, playerName })); } catch {}
 }
 
-function loadSession(): { roomCode: string; playerName: string } | null {
+function loadSession(): { roomCode: string; username: string; playerName: string } | null {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
     if (!raw) return null;
@@ -123,8 +124,8 @@ type OnlineState = {
   disconnect: () => void;
   setPlayerName: (name: string) => void;
   setRoomCode: (code: string) => void;
-  createRoom: () => void;
-  joinRoom: (code: string) => void;
+  createRoom: (username?: string) => void;
+  joinRoom: (code: string, username?: string) => void;
   startGame: () => void;
   leaveRoom: () => void;
   drawCard: () => void;
@@ -136,6 +137,7 @@ type OnlineState = {
   endTurn: () => void;
   clearError: () => void;
   resetOnline: () => void;
+  checkRoomVersion: (code: string, cb: (version: "stable" | "dev" | null) => void) => void;
 };
 
 let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
@@ -197,10 +199,11 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       const session = loadSession();
       const urlRoom = getRoomCodeFromUrl();
       const roomCode = urlRoom ?? session?.roomCode;
+      const username = session?.username;
       const playerName = session?.playerName ?? get().playerName;
 
-      if (roomCode && playerName) {
-        socket.emit("rejoin_room", { roomCode, playerName });
+      if (roomCode && (username || playerName)) {
+        socket.emit("rejoin_room", { roomCode, playerName: playerName, username });
       }
     });
 
@@ -214,11 +217,15 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       console.warn("[Socket] Connection error:", err.message);
     });
 
-    socket.on("room_joined", ({ roomCode }: { roomCode: string }) => {
+    socket.on("room_joined", ({ roomCode, version }: { roomCode: string; version?: "stable" | "dev" }) => {
       const { playerName } = get();
-      saveSession(roomCode, playerName);
+      const session = loadSession();
+      saveSession(roomCode, session?.username ?? "", playerName);
       setUrlRoomCode(roomCode);
       set({ roomCode, onlinePhase: "waiting_room" });
+      if (version && version !== "dev") {
+        useVersionStore.getState().setVersion(version);
+      }
     });
 
     socket.on("rejoin_ok", () => {
@@ -298,20 +305,22 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
   setPlayerName: (name) => set({ playerName: name }),
   setRoomCode: (code) => set({ roomCode: code }),
 
-  createRoom: () => {
+  createRoom: (username) => {
     const { socket, playerName } = get();
     if (!socket || !playerName.trim()) return;
     const name = playerName.trim();
-    socket.emit("create_room", { playerName: name, version: "dev" });
+    saveSession("", username ?? "", name);
+    socket.emit("create_room", { playerName: name, version: "dev", username });
     set({ playerName: name });
   },
 
-  joinRoom: (code) => {
+  joinRoom: (code, username) => {
     const { socket, playerName } = get();
     if (!socket || !playerName.trim() || !code.trim()) return;
     const name = playerName.trim();
     const roomCode = code.trim().toUpperCase();
-    socket.emit("join_room", { roomCode, playerName: name });
+    saveSession(roomCode, username ?? "", name);
+    socket.emit("join_room", { roomCode, playerName: name, username });
     set({ playerName: name });
   },
 
@@ -353,6 +362,16 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
 
   clearError: () => set({ errorMessage: null }),
 
+  checkRoomVersion: (code, cb) => {
+    const { socket } = get();
+    if (!socket) { cb(null); return; }
+    socket.once("room_version_result", ({ version, error }: { version: "stable" | "dev" | null; error?: string }) => {
+      if (error) { cb(null); return; }
+      cb(version);
+    });
+    socket.emit("check_room_version", { roomCode: code.toUpperCase() });
+  },
+
   resetOnline: () => {
     const { socket } = get();
     socket?.emit("leave_room");
@@ -372,5 +391,5 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
 }));
 
 export function persistSession(roomCode: string, playerName: string) {
-  saveSession(roomCode, playerName);
+  saveSession(roomCode, "", playerName);
 }

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { io, Socket } from "socket.io-client";
 import { Card, EventCard, FoodCard } from "../data/cards";
+import { useVersionStore } from "./versionStore";
 
 export type OnlineMessage = {
   id: number;
@@ -136,6 +137,7 @@ type OnlineState = {
   endTurn: () => void;
   clearError: () => void;
   resetOnline: () => void;
+  checkRoomVersion: (code: string, cb: (version: "stable" | "dev" | null) => void) => void;
 };
 
 let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
@@ -214,11 +216,14 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       console.warn("[Socket] Connection error:", err.message);
     });
 
-    socket.on("room_joined", ({ roomCode }: { roomCode: string }) => {
+    socket.on("room_joined", ({ roomCode, version }: { roomCode: string; version?: "stable" | "dev" }) => {
       const { playerName } = get();
       saveSession(roomCode, playerName);
       setUrlRoomCode(roomCode);
       set({ roomCode, onlinePhase: "waiting_room" });
+      if (version && version !== "stable") {
+        useVersionStore.getState().setVersion(version);
+      }
     });
 
     socket.on("rejoin_ok", () => {
@@ -352,6 +357,16 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
   endTurn: () => { get().socket?.emit("end_turn"); },
 
   clearError: () => set({ errorMessage: null }),
+
+  checkRoomVersion: (code, cb) => {
+    const { socket } = get();
+    if (!socket) { cb(null); return; }
+    socket.once("room_version_result", ({ version, error }: { version: "stable" | "dev" | null; error?: string }) => {
+      if (error) { cb(null); return; }
+      cb(version);
+    });
+    socket.emit("check_room_version", { roomCode: code.toUpperCase() });
+  },
 
   resetOnline: () => {
     const { socket } = get();

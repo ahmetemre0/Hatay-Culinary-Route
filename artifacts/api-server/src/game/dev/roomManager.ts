@@ -8,6 +8,7 @@ export type GameMessage = {
 
 export type ServerPlayer = {
   name: string;
+  username: string;
   socketId: string;
   hand: Card[];
   scoredFoods: FoodCard[];
@@ -68,7 +69,7 @@ function makeInitialState(): ServerGameState {
     canEndTurn: false,
     cookingAnimation: null,
     doubledMarketFoodIds: [],
-    victoryPoints: 50,
+    victoryPoints: 31,
   };
 }
 
@@ -79,12 +80,21 @@ export function addMessage(state: ServerGameState, text: string, type: GameMessa
 const rooms = new Map<string, Room>();
 const socketToRoom = new Map<string, string>();
 
-export function createRoom(hostSocketId: string, playerName: string): Room {
+export function createRoom(hostSocketId: string, playerName: string, username?: string): Room {
   let code = generateCode();
   while (rooms.has(code)) code = generateCode();
 
   const state = makeInitialState();
-  state.players.push({ name: playerName, socketId: hostSocketId, hand: [], scoredFoods: [], points: 0, skippedNextTurn: false, blockedFromRegion: false });
+  state.players.push({
+    name: playerName,
+    username: username ?? playerName,
+    socketId: hostSocketId,
+    hand: [],
+    scoredFoods: [],
+    points: 0,
+    skippedNextTurn: false,
+    blockedFromRegion: false,
+  });
   addMessage(state, `${playerName} odayı oluşturdu`, "info");
 
   const room: Room = { code, hostSocketId, state };
@@ -93,14 +103,28 @@ export function createRoom(hostSocketId: string, playerName: string): Room {
   return room;
 }
 
-export function joinRoom(socketId: string, code: string, playerName: string): { room: Room; error?: string } {
+export function joinRoom(socketId: string, code: string, playerName: string, username?: string): { room: Room; error?: string } {
   const room = rooms.get(code.toUpperCase());
   if (!room) return { room: null!, error: "Oda bulunamadı!" };
   if (room.state.phase !== "lobby") return { room: null!, error: "Oyun zaten başladı!" };
   if (room.state.players.length >= 4) return { room: null!, error: "Oda dolu! (Max 4 oyuncu)" };
   if (room.state.players.some(p => p.socketId === socketId)) return { room, error: undefined };
 
-  room.state.players.push({ name: playerName, socketId, hand: [], scoredFoods: [], points: 0, skippedNextTurn: false, blockedFromRegion: false });
+  const uname = username ?? playerName;
+  if (room.state.players.some(p => p.username === uname)) {
+    return { room: null!, error: "Bu kullanıcı adı odada zaten var!" };
+  }
+
+  room.state.players.push({
+    name: playerName,
+    username: uname,
+    socketId,
+    hand: [],
+    scoredFoods: [],
+    points: 0,
+    skippedNextTurn: false,
+    blockedFromRegion: false,
+  });
   addMessage(room.state, `${playerName} odaya katıldı`, "info");
   socketToRoom.set(socketId, code.toUpperCase());
   return { room };
@@ -116,18 +140,32 @@ export function getRoom(code: string): Room | null {
   return rooms.get(code.toUpperCase()) ?? null;
 }
 
-export function rejoinRoom(newSocketId: string, code: string, playerName: string): { room: Room | null; error?: string } {
+export function rejoinRoom(newSocketId: string, code: string, playerNameOrUsername: string, username?: string): { room: Room | null; error?: string } {
   const room = rooms.get(code.toUpperCase());
   if (!room) return { room: null, error: "Oda bulunamadı!" };
 
-  const pIdx = room.state.players.findIndex(p => p.name === playerName);
+  const uname = username ?? playerNameOrUsername;
+
+  let pIdx = room.state.players.findIndex(p => p.username === uname);
+  if (pIdx === -1) {
+    pIdx = room.state.players.findIndex(p => p.name === playerNameOrUsername);
+  }
 
   if (pIdx === -1) {
     if (room.state.phase !== "lobby") return { room: null, error: "Oyuncu bu odada bulunamadı!" };
     if (room.state.players.length >= 4) return { room: null, error: "Oda dolu! (Max 4 oyuncu)" };
-    room.state.players.push({ name: playerName, socketId: newSocketId, hand: [], scoredFoods: [], points: 0, skippedNextTurn: false, blockedFromRegion: false });
+    room.state.players.push({
+      name: playerNameOrUsername,
+      username: uname,
+      socketId: newSocketId,
+      hand: [],
+      scoredFoods: [],
+      points: 0,
+      skippedNextTurn: false,
+      blockedFromRegion: false,
+    });
     socketToRoom.set(newSocketId, code.toUpperCase());
-    addMessage(room.state, `${playerName} odaya katıldı`, "info");
+    addMessage(room.state, `${playerNameOrUsername} odaya katıldı`, "info");
     return { room };
   }
 
@@ -139,7 +177,7 @@ export function rejoinRoom(newSocketId: string, code: string, playerName: string
   if (room.hostSocketId === oldSocketId) room.hostSocketId = newSocketId;
 
   if (room.state.phase !== "lobby") {
-    addMessage(room.state, `${playerName} yeniden bağlandı`, "info");
+    addMessage(room.state, `${room.state.players[pIdx].name} yeniden bağlandı`, "info");
   }
   return { room };
 }
@@ -330,7 +368,6 @@ export function handleUseEventCard(room: Room, socketId: string, cardId: string)
   const card = cur.hand.find(c => c.id === cardId) as EventCard | undefined;
   if (!card || card.type !== "event") return { error: "Geçersiz kart!" };
 
-  // draw_two — Bereketli Topraklar
   if (card.action === "draw_two") {
     const drawn: Card[] = [];
     for (let i = 0; i < 2 && state.drawDeck.length > 0; i++) drawn.push(state.drawDeck.shift()!);
@@ -340,13 +377,10 @@ export function handleUseEventCard(room: Room, socketId: string, cardId: string)
     return {};
   }
 
-  // reshuffle_all — Asi Nehri Taştı: all cards from all hands are pooled + reshuffled, each draws N new
   if (card.action === "reshuffle_all") {
-    // Record hand sizes before clearing
     const handSizes = state.players.map(p =>
       p.socketId === cur.socketId ? p.hand.filter(c => c.id !== cardId).length : p.hand.length
     );
-    // Pool all cards from all hands + draw deck
     let pool: Card[] = [...state.drawDeck];
     state.players.forEach(p => {
       if (p.socketId === cur.socketId) pool.push(...p.hand.filter(c => c.id !== cardId));
@@ -354,7 +388,6 @@ export function handleUseEventCard(room: Room, socketId: string, cardId: string)
       p.hand = [];
     });
     pool = shuffle(pool);
-    // Each player draws N new cards (N = original hand size)
     let poolIdx = 0;
     state.players.forEach((p, i) => {
       const drawn: Card[] = [];
@@ -367,7 +400,6 @@ export function handleUseEventCard(room: Room, socketId: string, cardId: string)
     return {};
   }
 
-  // block_region — Sıcak Hava Dalgası
   if (card.action === "block_region") {
     state.players.forEach((p, i) => {
       if (i !== state.currentPlayerIndex) p.blockedFromRegion = true;
@@ -378,7 +410,6 @@ export function handleUseEventCard(room: Room, socketId: string, cardId: string)
     return {};
   }
 
-  // multiply_points — Künefe Şöleni (needs food selection)
   if (card.action === "multiply_points") {
     if (state.marketFoods.length === 0) return { error: "Sipariş penceresi boş!" };
     state.pendingEvent = card;
@@ -386,7 +417,6 @@ export function handleUseEventCard(room: Room, socketId: string, cardId: string)
     return { needsTarget: true };
   }
 
-  // collect_all_meat — Kasap İndirimi
   if (card.action === "collect_all_meat") {
     cur.hand = cur.hand.filter(c => c.id !== cardId);
     state.discardPile.push(card);
@@ -403,11 +433,9 @@ export function handleUseEventCard(room: Room, socketId: string, cardId: string)
     return {};
   }
 
-  // refresh_orders — Mutfak Sürprizi
   if (card.action === "refresh_orders") {
     cur.hand = cur.hand.filter(c => c.id !== cardId);
     state.discardPile.push(card);
-    // Put current market foods back at bottom of foodDeck and draw fresh ones
     state.foodDeck = [...state.foodDeck, ...state.marketFoods];
     state.marketFoods = [];
     state.doubledMarketFoodIds = [];
@@ -418,7 +446,6 @@ export function handleUseEventCard(room: Room, socketId: string, cardId: string)
     return {};
   }
 
-  // instant_points — Yaruhe Kalbek
   if (card.action === "instant_points") {
     cur.hand = cur.hand.filter(c => c.id !== cardId);
     state.discardPile.push(card);
@@ -433,7 +460,6 @@ export function handleUseEventCard(room: Room, socketId: string, cardId: string)
     return {};
   }
 
-  // multiply_lowest_points — Memleket Hasreti
   if (card.action === "multiply_lowest_points") {
     cur.hand = cur.hand.filter(c => c.id !== cardId);
     state.discardPile.push(card);
@@ -453,14 +479,12 @@ export function handleUseEventCard(room: Room, socketId: string, cardId: string)
     return {};
   }
 
-  // swap_all_cards — needs target player
   if (card.action === "swap_all_cards") {
     state.pendingEvent = card;
     state.phase = "event_pending";
     return { needsTarget: true };
   }
 
-  // skip_turn, steal_card, trade_two
   if (card.action === "skip_turn" || card.action === "steal_card" || card.action === "trade_two") {
     state.pendingEvent = card;
     state.phase = "event_pending";
