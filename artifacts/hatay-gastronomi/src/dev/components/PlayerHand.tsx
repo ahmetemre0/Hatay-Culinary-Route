@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { GameCard } from "./GameCard";
 import { useGameStore } from "../store/gameStore";
@@ -42,6 +43,8 @@ export function PlayerHand() {
     if (ids) ids.forEach((id) => completableIds.add(id));
   }
 
+  const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
+
   const handleCardClick = (card: Card) => {
     if (phase !== "playing") return;
     if (card.type === "event") {
@@ -82,26 +85,53 @@ export function PlayerHand() {
         </div>
       </div>
 
-      <div className="flex gap-2 flex-wrap justify-center min-h-[10rem]">
+      <div className="relative h-48 flex items-end justify-center">
         <AnimatePresence>
           {current.hand.map((card, idx) => {
             const isSelected = selectedCards.includes(card.id);
             const isEvent = card.type === "event";
             const isCompletable = completableIds.has(card.id);
+            const isHovered = hoveredCardId === card.id;
+            const totalCards = current.hand.length;
+            const angleSpread = Math.min(totalCards * 8, 60);
+            const centerIdx = totalCards / 2;
+            const cardAngle = (idx - centerIdx + 0.5) * (angleSpread / Math.max(totalCards - 1, 1));
+            
+            let xOffset = 0;
+            if (hoveredCardId) {
+              const hoveredIdx = current.hand.findIndex(c => c.id === hoveredCardId);
+              if (isHovered) {
+                xOffset = 0;
+              } else {
+                xOffset = idx < hoveredIdx ? -40 : 40;
+              }
+            }
+
             return (
               <motion.div
                 key={card.id}
                 initial={{ opacity: 0, y: 80, rotateZ: -45, rotateY: 90 }}
-                animate={{ opacity: 1, y: 0, rotateZ: 0, rotateY: 0 }}
+                animate={{ 
+                  opacity: 1, 
+                  y: 0, 
+                  rotateZ: isHovered ? 0 : cardAngle,
+                  rotateY: 0,
+                  x: xOffset,
+                  scale: isHovered ? 1.1 : 1,
+                  zIndex: isHovered ? 50 : idx
+                }}
                 exit={{ opacity: 0, y: -120, scale: 0.5, rotateZ: 20 }}
                 transition={{ 
                   duration: 0.5, 
                   delay: idx * 0.05, 
                   ease: "easeOut",
-                  exit: { duration: 0.4, ease: "easeIn" }
+                  exit: { duration: 0.4, ease: "easeIn" },
+                  x: { duration: 0.3, ease: "easeOut" }
                 }}
-                className="relative"
+                className="absolute bottom-0"
                 style={{ perspective: 1000 }}
+                onMouseEnter={() => setHoveredCardId(card.id)}
+                onMouseLeave={() => setHoveredCardId(null)}
               >
                 <GameCard
                   card={card}
