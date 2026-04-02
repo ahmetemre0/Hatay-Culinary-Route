@@ -292,7 +292,7 @@ function OnlineMarketArea() {
     onlinePhase,
     hasDrawnThisTurn,
     cookingAnimation,
-    doubledMarketFoodId,
+    doubledMarketFoodIds,
     myPlayerIndex,
     currentPlayerIndex,
     myHand,
@@ -350,7 +350,7 @@ function OnlineMarketArea() {
           <div className="flex gap-3 justify-center flex-wrap">
             <AnimatePresence>
               {marketFoods.map((food) => {
-                const isDoubled = doubledMarketFoodId === food.id;
+                const isDoubled = doubledMarketFoodIds.includes(food.id);
                 const isAnimating = cookingAnimation === food.id;
                 const matchState = canAct ? selectionMatchesFood(myHand, selectedCards, food.requiredMaterials) : "none";
                 const highlighted = getHighlighted(food);

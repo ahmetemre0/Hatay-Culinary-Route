@@ -34,7 +34,7 @@ export type ServerGameState = {
   hasDrawnThisTurn: boolean;
   canEndTurn: boolean;
   cookingAnimation: string | null;
-  doubledMarketFoodId: string | null;
+  doubledMarketFoodIds: string[];
   victoryPoints: number;
 };
 
@@ -65,7 +65,7 @@ function makeInitialState(): ServerGameState {
     hasDrawnThisTurn: false,
     canEndTurn: false,
     cookingAnimation: null,
-    doubledMarketFoodId: null,
+    doubledMarketFoodIds: [],
     victoryPoints: 50,
   };
 }
@@ -198,7 +198,7 @@ export function startGame(room: Room): string | null {
   state.winnerIndex = null;
   state.hasDrawnThisTurn = false;
   state.canEndTurn = false;
-  state.doubledMarketFoodId = null;
+  state.doubledMarketFoodIds = [];
   state.pendingEvent = null;
   state.cookingAnimation = null;
   state.messages = [];
@@ -299,11 +299,11 @@ export function handleTryComplete(room: Room, socketId: string, foodId: string, 
   state.marketFoods = state.marketFoods.filter(f => f.id !== foodId);
   if (state.foodDeck.length > 0) state.marketFoods.push(state.foodDeck.shift()!);
 
-  const isDoubled = state.doubledMarketFoodId === foodId;
+  const isDoubled = state.doubledMarketFoodIds.includes(foodId);
   const earned = isDoubled ? food.points * 2 : food.points;
   cur.points += earned;
   cur.scoredFoods.push(food);
-  if (isDoubled) state.doubledMarketFoodId = null;
+  if (isDoubled) state.doubledMarketFoodIds = state.doubledMarketFoodIds.filter(id => id !== foodId);
 
   state.cookingAnimation = foodId;
   setTimeout(() => { if (room.state.cookingAnimation === foodId) room.state.cookingAnimation = null; }, 1500);
@@ -482,7 +482,7 @@ export function handleResolveEvent(room: Room, socketId: string, targetPlayerId?
     if (!food) return "Sipariş bulunamadı!";
     cur.hand = cur.hand.filter(c => c.id !== card.id);
     state.discardPile.push(card);
-    state.doubledMarketFoodId = foodId;
+    state.doubledMarketFoodIds = [...state.doubledMarketFoodIds, foodId];
     state.pendingEvent = null;
     state.phase = "playing";
     addMessage(state, `🧁 ${cur.name} "${card.effectName}" kullandı! ${food.emoji} ${food.name} kartı 2x puan!`, "event");
@@ -608,7 +608,7 @@ export function buildPlayerView(room: Room, playerIndex: number) {
     drawDeckSize: state.drawDeck.length,
     discardPileSize: state.discardPile.length,
     foodDeckSize: state.foodDeck.length,
-    doubledMarketFoodId: state.doubledMarketFoodId,
+    doubledMarketFoodIds: state.doubledMarketFoodIds,
     messages: state.messages,
     winnerIndex: state.winnerIndex,
     hasDrawnThisTurn: isMyTurn ? state.hasDrawnThisTurn : false,

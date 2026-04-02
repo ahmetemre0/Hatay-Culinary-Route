@@ -17,7 +17,7 @@ export function MarketArea() {
     phase,
     hasDrawnThisTurn,
     cookingAnimation,
-    doubledMarketFoodId,
+    doubledMarketFoodIds,
     selectedCards,
   } = useGameStore();
 
@@ -74,7 +74,7 @@ export function MarketArea() {
           <div className="flex gap-3 justify-center flex-wrap">
             <AnimatePresence>
               {marketFoods.map((food) => {
-                const isDoubled = doubledMarketFoodId === food.id;
+                const isDoubled = doubledMarketFoodIds.includes(food.id);
                 const matchState = phase === "playing" && !current?.blockedFromRegion
                   ? selectionMatchesFood(food.id)
                   : "none";

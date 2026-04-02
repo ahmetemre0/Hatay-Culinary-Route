@@ -53,7 +53,7 @@ type GameState = {
   canEndTurn: boolean;
   victoryPoints: number;
   cookingAnimation: string | null;
-  doubledMarketFoodId: string | null;
+  doubledMarketFoodIds: string[];
 
   startGame: (numPlayers: number, names: string[]) => void;
   drawCard: () => void;
@@ -144,7 +144,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   canEndTurn: false,
   victoryPoints: 50,
   cookingAnimation: null,
-  doubledMarketFoodId: null,
+  doubledMarketFoodIds: [],
 
   startGame: (numPlayers, names) => {
     const { foodDeck, materialEventDeck } = buildInitialDecks();
@@ -170,7 +170,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       phase: "playing", players, currentPlayerIndex: 0,
       marketFoods: market, drawDeck: deck, foodDeck: fDeck, discardPile: [],
       selectedCards: [], logs, logIdCounter: counter, winnerIndex: null,
-      hasDrawnThisTurn: false, canEndTurn: false, doubledMarketFoodId: null,
+      hasDrawnThisTurn: false, canEndTurn: false, doubledMarketFoodIds: [],
     });
   },
 
@@ -246,7 +246,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     let newFoodDeck = [...state.foodDeck];
     if (newFoodDeck.length > 0) newMarket.push(newFoodDeck.shift()!);
 
-    const isDoubled = state.doubledMarketFoodId === food.id;
+    const isDoubled = state.doubledMarketFoodIds.includes(food.id);
     const earnedPoints = isDoubled ? food.points * 2 : food.points;
     const totalPts = cur.points + earnedPoints;
 
@@ -267,7 +267,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       players, marketFoods: newMarket, foodDeck: newFoodDeck,
       selectedCards: [], logs, logIdCounter,
       cookingAnimation: foodId,
-      doubledMarketFoodId: isDoubled ? null : state.doubledMarketFoodId,
+      doubledMarketFoodIds: isDoubled ? state.doubledMarketFoodIds.filter(id => id !== food.id) : state.doubledMarketFoodIds,
     };
 
     if (totalPts >= state.victoryPoints) {
@@ -487,7 +487,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         i === state.currentPlayerIndex ? { ...p, hand: newHand } : p
       );
       const r = addLog(state.logs, state.logIdCounter, `🏰 ${cur.name} "Saray Caddesine Taşındık" kullandı! "${food.name}" kartının puanı 2x oldu!`, "event");
-      set({ players, phase: "playing", pendingEvent: null, doubledMarketFoodId: foodId, logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] });
+      set({ players, phase: "playing", pendingEvent: null, doubledMarketFoodIds: [...state.doubledMarketFoodIds, foodId], logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] });
       return;
     }
 
@@ -551,7 +551,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       selectedCards: [], pendingEvent: null, pendingEventTarget: null,
       logs: [], logIdCounter: 0, winnerIndex: null,
       hasDrawnThisTurn: false, canEndTurn: false,
-      cookingAnimation: null, doubledMarketFoodId: null,
+      cookingAnimation: null, doubledMarketFoodIds: [],
     });
   },
 }));

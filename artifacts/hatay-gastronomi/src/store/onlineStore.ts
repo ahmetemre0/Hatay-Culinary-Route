@@ -36,7 +36,7 @@ export type PlayerView = {
   drawDeckSize: number;
   discardPileSize: number;
   foodDeckSize: number;
-  doubledMarketFoodId: string | null;
+  doubledMarketFoodIds: string[];
   messages: OnlineMessage[];
   winnerIndex: number | null;
   hasDrawnThisTurn: boolean;
@@ -109,7 +109,7 @@ type OnlineState = {
   drawDeckSize: number;
   discardPileSize: number;
   foodDeckSize: number;
-  doubledMarketFoodId: string | null;
+  doubledMarketFoodIds: string[];
   messages: OnlineMessage[];
   winnerIndex: number | null;
   hasDrawnThisTurn: boolean;
@@ -162,7 +162,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
   drawDeckSize: 0,
   discardPileSize: 0,
   foodDeckSize: 0,
-  doubledMarketFoodId: null,
+  doubledMarketFoodIds: [],
   messages: [],
   winnerIndex: null,
   hasDrawnThisTurn: false,
@@ -255,7 +255,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
         drawDeckSize: view.drawDeckSize,
         discardPileSize: view.discardPileSize,
         foodDeckSize: view.foodDeckSize,
-        doubledMarketFoodId: view.doubledMarketFoodId,
+        doubledMarketFoodIds: view.doubledMarketFoodIds ?? [],
         messages: view.messages,
         winnerIndex: view.winnerIndex,
         hasDrawnThisTurn: view.hasDrawnThisTurn,
@@ -364,7 +364,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       playerName: "", roomCode: "", isHost: false, myPlayerIndex: -1,
       players: [], myHand: [], currentPlayerIndex: 0,
       marketFoods: [], drawDeckSize: 0, discardPileSize: 0, foodDeckSize: 0,
-      doubledMarketFoodId: null, messages: [], winnerIndex: null,
+      doubledMarketFoodIds: [], messages: [], winnerIndex: null,
       hasDrawnThisTurn: false, canEndTurn: false, pendingEvent: null,
       cookingAnimation: null, selectedCards: [],
     });
