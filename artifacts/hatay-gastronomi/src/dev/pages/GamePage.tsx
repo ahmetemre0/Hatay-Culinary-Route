@@ -4,6 +4,7 @@ import { PlayerHand } from "../components/PlayerHand";
 import { Scoreboard } from "../components/Scoreboard";
 import { GameLog } from "../components/GameLog";
 import { EventModal } from "../components/EventModal";
+import { OrientationWarning } from "../components/OrientationWarning";
 import { useGameStore } from "../store/gameStore";
 export function GamePage() {
   const {
@@ -17,6 +18,7 @@ export function GamePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-stone-950 via-amber-950 to-red-950 p-3 flex flex-col">
+      <OrientationWarning />
       <EventModal />
 
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
