@@ -81,6 +81,27 @@ export function addMessage(state: ServerGameState, text: string, type: GameMessa
 
 const rooms = new Map<string, Room>();
 const socketToRoom = new Map<string, string>();
+const pendingDeletions = new Map<string, ReturnType<typeof setTimeout>>();
+
+function scheduleRoomDeletion(code: string) {
+  if (pendingDeletions.has(code)) return;
+  const timer = setTimeout(() => {
+    const room = rooms.get(code);
+    if (room && room.state.players.length === 0) {
+      rooms.delete(code);
+    }
+    pendingDeletions.delete(code);
+  }, 60_000);
+  pendingDeletions.set(code, timer);
+}
+
+function cancelRoomDeletion(code: string) {
+  const timer = pendingDeletions.get(code);
+  if (timer !== undefined) {
+    clearTimeout(timer);
+    pendingDeletions.delete(code);
+  }
+}
 
 export function createRoom(hostSocketId: string, playerName: string, username?: string): Room {
   let code = generateCode();
@@ -108,6 +129,7 @@ export function createRoom(hostSocketId: string, playerName: string, username?: 
 export function joinRoom(socketId: string, code: string, playerName: string, username?: string): { room: Room; error?: string } {
   const room = rooms.get(code.toUpperCase());
   if (!room) return { room: null!, error: "Oda bulunamadı!" };
+  cancelRoomDeletion(code.toUpperCase());
   if (room.state.phase !== "lobby") return { room: null!, error: "Oyun zaten başladı!" };
   if (room.state.players.length >= 4) return { room: null!, error: "Oda dolu! (Max 4 oyuncu)" };
   if (room.state.players.some(p => p.socketId === socketId)) return { room, error: undefined };
@@ -148,6 +170,8 @@ export function getRoom(code: string): Room | null {
 export function rejoinRoom(newSocketId: string, code: string, playerNameOrUsername: string, username?: string): { room: Room | null; error?: string } {
   const room = rooms.get(code.toUpperCase());
   if (!room) return { room: null, error: "Oda bulunamadı!" };
+
+  cancelRoomDeletion(code.toUpperCase());
 
   const uname = username ?? playerNameOrUsername;
   if ((room.state.bannedUsernames ?? []).includes(uname)) {
@@ -209,7 +233,8 @@ export function removePlayer(socketId: string): { room: Room | null; wasHost: bo
   if (room.state.phase === "lobby") {
     room.state.players = room.state.players.filter(p => p.socketId !== socketId);
     if (room.state.players.length === 0) {
-      rooms.delete(room.code);
+      // Delay deletion by 1 minute so players can reconnect
+      scheduleRoomDeletion(room.code);
       return { room: null, wasHost, playerName };
     }
     if (wasHost && room.state.players.length > 0) room.hostSocketId = room.state.players[0].socketId;
@@ -237,7 +262,7 @@ export function permanentLeavePlayer(socketId: string): { room: Room | null; was
   if (room.state.phase === "lobby") {
     room.state.players = room.state.players.filter((_, i) => i !== pIdx);
     if (room.state.players.length === 0) {
-      rooms.delete(room.code);
+      scheduleRoomDeletion(room.code);
       return { room: null, wasHost, playerName };
     }
     if (wasHost) room.hostSocketId = room.state.players[0].socketId;
@@ -310,11 +335,13 @@ export function banPlayer(room: Room, hostSocketId: string, targetIndex: number)
 }
 
 export function destroyRoom(code: string): string[] {
-  const room = rooms.get(code.toUpperCase());
+  const upperCode = code.toUpperCase();
+  const room = rooms.get(upperCode);
   if (!room) return [];
+  cancelRoomDeletion(upperCode);
   const socketIds = room.state.players.map(p => p.socketId);
   socketIds.forEach(sid => socketToRoom.delete(sid));
-  rooms.delete(code.toUpperCase());
+  rooms.delete(upperCode);
   return socketIds;
 }
 
