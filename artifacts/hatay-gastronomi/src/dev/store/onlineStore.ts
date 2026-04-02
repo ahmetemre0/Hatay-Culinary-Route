@@ -169,7 +169,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
   canEndTurn: false,
   pendingEvent: null,
   cookingAnimation: null,
-  victoryPoints: 50,
+  victoryPoints: 31,
   selectedCards: [],
 
   connect: () => {

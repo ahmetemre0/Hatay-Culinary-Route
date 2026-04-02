@@ -142,7 +142,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   winnerIndex: null,
   hasDrawnThisTurn: false,
   canEndTurn: false,
-  victoryPoints: 50,
+  victoryPoints: 31,
   cookingAnimation: null,
   doubledMarketFoodIds: [],
 
