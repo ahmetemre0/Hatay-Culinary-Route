@@ -1,7 +1,7 @@
 import { Server, Socket } from "socket.io";
 import * as stableRM from "./roomManager.js";
 import * as devRM from "./dev/roomManager.js";
-import { saveRoom, loadRoom, deleteRoom, registerDevUser, loginDevUser } from "./db.js";
+import { saveRoom, loadRoom, deleteRoom, registerDevUser, loginDevUser, saveChatMessage, loadChatMessages, deleteChatMessages } from "./db.js";
 
 type RM = typeof stableRM;
 type Room = stableRM.Room;
@@ -43,7 +43,24 @@ function scheduleDeleteIfGameOver(room: Room) {
   if (room.state.phase === "game_over") {
     setTimeout(() => {
       deleteRoom(room.code).catch(err => console.error("[DB] Delete error:", err));
+      deleteChatMessages(room.code).catch(err => console.error("[DB] Chat delete error:", err));
     }, 60_000);
+  }
+}
+
+async function sendChatHistory(socket: Socket, roomCode: string) {
+  try {
+    const rows = await loadChatMessages(roomCode);
+    const messages = rows.map((r) => ({
+      id: r.id,
+      playerName: r.player_name,
+      text: r.text,
+      timestamp: Number(r.ts),
+    }));
+    socket.emit("chat_history", messages);
+  } catch (err) {
+    console.error("[DB] loadChatMessages error:", err);
+    socket.emit("chat_history", []);
   }
 }
 
@@ -123,6 +140,7 @@ export function setupSocketHandler(io: Server) {
         socket.join(room.code);
         socket.emit("room_created", { roomCode: room.code });
         socket.emit("room_joined", { roomCode: room.code, version: room.state.version });
+        socket.emit("chat_history", []);
         saveAsync(room);
         const rm = getRMForVersion(ver);
         emitAll(io, room, rm);
@@ -153,6 +171,7 @@ export function setupSocketHandler(io: Server) {
         if (error || !room) { socket.emit("error_msg", { message: error ?? "Odaya katılınamadı!" }); return; }
         socket.join(room.code);
         socket.emit("room_joined", { roomCode: room.code, version: room.state.version });
+        sendChatHistory(socket, room.code);
         saveAsync(room);
         emitAll(io, room, rm);
       } catch (e) {
@@ -281,6 +300,7 @@ export function setupSocketHandler(io: Server) {
         } else {
           socket.emit("rejoin_ok");
         }
+        sendChatHistory(socket, rejoined.code);
         saveAsync(rejoined);
         emitAll(io, rejoined, rm);
       } catch (e) {
@@ -288,17 +308,21 @@ export function setupSocketHandler(io: Server) {
       }
     });
 
-    socket.on("send_chat", ({ text }: { text: string }) => {
+    socket.on("send_chat", async ({ text }: { text: string }) => {
       const found = findBySocket(socket.id);
       if (!found) return;
       const sanitized = String(text ?? "").trim().slice(0, 120);
       if (!sanitized) return;
       const player = found.room.state.players.find((p) => p.socketId === socket.id);
       const playerName = player?.name ?? "?";
+      const ts = Date.now();
+      try { await saveChatMessage(found.room.code, playerName, sanitized, ts); } catch (err) {
+        console.error("[DB] saveChatMessage error:", err);
+      }
       io.to(found.room.code).emit("receive_chat", {
         playerName,
         text: sanitized,
-        timestamp: Date.now(),
+        timestamp: ts,
       });
     });
 

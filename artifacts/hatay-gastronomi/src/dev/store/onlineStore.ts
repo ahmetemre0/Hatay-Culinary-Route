@@ -292,6 +292,17 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       set({ errorMessage: message });
     });
 
+    socket.on("chat_history", (history: Array<{ id: number; playerName: string; text: string; timestamp: number }>) => {
+      set({
+        chatMessages: history.map((m) => ({
+          id: m.id,
+          playerName: m.playerName,
+          text: m.text,
+          timestamp: m.timestamp,
+        })),
+      });
+    });
+
     socket.on("receive_chat", (msg: { playerName: string; text: string; timestamp: number }) => {
       set((state) => ({
         chatMessages: [

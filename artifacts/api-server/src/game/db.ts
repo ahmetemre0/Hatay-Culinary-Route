@@ -43,6 +43,47 @@ export async function initDb(): Promise<void> {
     )
   `);
   console.log("[DB] dev_users table ready");
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id SERIAL PRIMARY KEY,
+      room_code TEXT NOT NULL,
+      player_name TEXT NOT NULL,
+      text TEXT NOT NULL,
+      ts BIGINT NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_chat_messages_room_code ON chat_messages (room_code)
+  `);
+  console.log("[DB] chat_messages table ready");
+}
+
+export type ChatRow = {
+  id: number;
+  player_name: string;
+  text: string;
+  ts: string;
+};
+
+export async function saveChatMessage(roomCode: string, playerName: string, text: string, ts: number): Promise<void> {
+  await pool.query(
+    "INSERT INTO chat_messages (room_code, player_name, text, ts) VALUES ($1, $2, $3, $4)",
+    [roomCode, playerName, text, ts]
+  );
+}
+
+export async function loadChatMessages(roomCode: string, limit = 100): Promise<ChatRow[]> {
+  const result = await pool.query<ChatRow>(
+    "SELECT id, player_name, text, ts FROM chat_messages WHERE room_code = $1 ORDER BY id ASC LIMIT $2",
+    [roomCode, limit]
+  );
+  return result.rows;
+}
+
+export async function deleteChatMessages(roomCode: string): Promise<void> {
+  await pool.query("DELETE FROM chat_messages WHERE room_code = $1", [roomCode]);
 }
 
 export async function saveRoom(code: string, hostSocketId: string, state: ServerGameState): Promise<void> {
