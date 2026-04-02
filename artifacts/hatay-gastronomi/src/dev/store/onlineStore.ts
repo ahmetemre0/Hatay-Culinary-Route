@@ -532,7 +532,8 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     if (!session) return;
     const { socket, connected } = get();
     if (!connected || !socket?.connected) return;
-    set({ playerName: session.playerName });
+    // Set to a non-idle phase so game_state events are not ignored on arrival
+    set({ playerName: session.playerName, roomCode: session.roomCode, onlinePhase: "waiting_room" });
     socket.emit("rejoin_room", {
       roomCode: session.roomCode,
       playerName: session.playerName,
