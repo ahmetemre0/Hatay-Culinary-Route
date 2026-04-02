@@ -97,13 +97,18 @@ export function PlayerHand() {
             const centerIdx = totalCards / 2;
             const cardAngle = (idx - centerIdx + 0.5) * (angleSpread / Math.max(totalCards - 1, 1));
             
-            let xOffset = 0;
+            // Base X position for fan spread - each card is offset horizontally
+            const cardSpacing = 35; // pixels between each card's center
+            const baseX = (idx - centerIdx + 0.5) * cardSpacing;
+            
+            // Additional hover spread
+            let hoverXOffset = 0;
             if (hoveredCardId) {
               const hoveredIdx = current.hand.findIndex(c => c.id === hoveredCardId);
               if (isHovered) {
-                xOffset = 0;
+                hoverXOffset = 0;
               } else {
-                xOffset = idx < hoveredIdx ? -40 : 40;
+                hoverXOffset = idx < hoveredIdx ? -60 : 60;
               }
             }
 
@@ -116,7 +121,7 @@ export function PlayerHand() {
                   y: 0, 
                   rotateZ: isHovered ? 0 : cardAngle,
                   rotateY: 0,
-                  x: xOffset,
+                  x: baseX + hoverXOffset,
                   scale: isHovered ? 1.1 : 1,
                   zIndex: isHovered ? 50 : idx
                 }}
@@ -128,7 +133,7 @@ export function PlayerHand() {
                   exit: { duration: 0.4, ease: "easeIn" },
                   x: { duration: 0.3, ease: "easeOut" }
                 }}
-                className="absolute bottom-0"
+                className="absolute bottom-0 left-1/2 -translate-x-1/2"
                 style={{ perspective: 1000 }}
                 onMouseEnter={() => setHoveredCardId(card.id)}
                 onMouseLeave={() => setHoveredCardId(null)}
