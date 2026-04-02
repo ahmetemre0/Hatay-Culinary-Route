@@ -151,7 +151,7 @@ export function LobbyPage({ onBack }: Props) {
   };
 
   const isWaiting = onlinePhase === "waiting_room";
-  const hasActiveSession = !!activeSession && onlinePhase === "idle";
+  const hasActiveSession = !!activeSession && !!activeSession.roomCode && onlinePhase === "idle";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-violet-900 via-purple-900 to-stone-900 flex items-center justify-center p-4">

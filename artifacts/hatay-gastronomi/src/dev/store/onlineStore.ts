@@ -476,9 +476,9 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
 
   leaveRoom: () => {
     // Set idle FIRST so game_state events get ignored
+    // Do NOT clear session — user can rejoin from "Aktif Oyun" panel
     set({ onlinePhase: "idle", roomCode: "", isHost: false, players: [], myHand: [], messages: [], chatMessages: [] });
     get().socket?.emit("leave_room");
-    clearSession();
     clearUrlRoomCode();
   },
 
