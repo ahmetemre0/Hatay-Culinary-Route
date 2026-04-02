@@ -288,6 +288,20 @@ export function setupSocketHandler(io: Server) {
       }
     });
 
+    socket.on("send_chat", ({ text }: { text: string }) => {
+      const found = findBySocket(socket.id);
+      if (!found) return;
+      const sanitized = String(text ?? "").trim().slice(0, 120);
+      if (!sanitized) return;
+      const player = found.room.state.players.find((p) => p.socketId === socket.id);
+      const playerName = player?.name ?? "?";
+      io.to(found.room.code).emit("receive_chat", {
+        playerName,
+        text: sanitized,
+        timestamp: Date.now(),
+      });
+    });
+
     socket.on("leave_room", () => {
       const found = findBySocket(socket.id);
       if (found) {

@@ -9,6 +9,13 @@ export type OnlineMessage = {
   type: "info" | "success" | "warning" | "event";
 };
 
+export type ChatMessage = {
+  id: number;
+  playerName: string;
+  text: string;
+  timestamp: number;
+};
+
 export type OnlinePlayerInfo = {
   name: string;
   cardCount: number;
@@ -120,6 +127,8 @@ type OnlineState = {
   victoryPoints: number;
   selectedCards: string[];
 
+  chatMessages: ChatMessage[];
+
   connect: () => void;
   disconnect: () => void;
   setPlayerName: (name: string) => void;
@@ -138,6 +147,7 @@ type OnlineState = {
   clearError: () => void;
   resetOnline: () => void;
   checkRoomVersion: (code: string, cb: (version: "stable" | "dev" | null) => void) => void;
+  sendChatMessage: (text: string) => void;
 };
 
 let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
@@ -173,6 +183,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
   cookingAnimation: null,
   victoryPoints: 31,
   selectedCards: [],
+  chatMessages: [],
 
   connect: () => {
     const existing = get().socket;
@@ -281,6 +292,15 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       set({ errorMessage: message });
     });
 
+    socket.on("receive_chat", (msg: { playerName: string; text: string; timestamp: number }) => {
+      set((state) => ({
+        chatMessages: [
+          ...state.chatMessages,
+          { id: Date.now() + Math.random(), playerName: msg.playerName, text: msg.text, timestamp: msg.timestamp },
+        ].slice(-100),
+      }));
+    });
+
     set({ socket });
 
     const handleVisibilityChange = () => {
@@ -330,7 +350,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     get().socket?.emit("leave_room");
     clearSession();
     clearUrlRoomCode();
-    set({ onlinePhase: "idle", roomCode: "", isHost: false, players: [], myHand: [], messages: [] });
+    set({ onlinePhase: "idle", roomCode: "", isHost: false, players: [], myHand: [], messages: [], chatMessages: [] });
   },
 
   drawCard: () => { get().socket?.emit("draw_card"); },
@@ -360,6 +380,12 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
 
   endTurn: () => { get().socket?.emit("end_turn"); },
 
+  sendChatMessage: (text) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    get().socket?.emit("send_chat", { text: trimmed });
+  },
+
   clearError: () => set({ errorMessage: null }),
 
   checkRoomVersion: (code, cb) => {
@@ -385,7 +411,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       marketFoods: [], drawDeckSize: 0, discardPileSize: 0, foodDeckSize: 0,
       doubledMarketFoodIds: [], messages: [], winnerIndex: null,
       hasDrawnThisTurn: false, canEndTurn: false, pendingEvent: null,
-      cookingAnimation: null, selectedCards: [],
+      cookingAnimation: null, selectedCards: [], chatMessages: [],
     });
   },
 }));

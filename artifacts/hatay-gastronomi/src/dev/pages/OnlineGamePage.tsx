@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useOnlineStore } from "../store/onlineStore";
 import { GameCard } from "../components/GameCard";
@@ -687,6 +687,100 @@ function MessagePanel() {
   );
 }
 
+function ChatPanel() {
+  const chatMessages = useOnlineStore((s) => s.chatMessages);
+  const sendChatMessage = useOnlineStore((s) => s.sendChatMessage);
+  const myPlayerIndex = useOnlineStore((s) => s.myPlayerIndex);
+  const players = useOnlineStore((s) => s.players);
+
+  const [inputText, setInputText] = useState("");
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
+
+  const handleSend = useCallback(() => {
+    const trimmed = inputText.trim();
+    if (!trimmed) return;
+    sendChatMessage(trimmed);
+    setInputText("");
+    inputRef.current?.focus();
+  }, [inputText, sendChatMessage]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") { e.preventDefault(); handleSend(); }
+  };
+
+  const myName = players[myPlayerIndex]?.name ?? "";
+
+  const formatTime = (ts: number) => {
+    const d = new Date(ts);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  };
+
+  return (
+    <div className="bg-black/30 backdrop-blur-sm rounded-2xl border border-white/10 flex flex-col overflow-hidden" style={{ maxHeight: "200px" }}>
+      <div className="text-white/50 text-[10px] uppercase tracking-wider px-3 pt-2.5 pb-1 shrink-0">
+        💬 Sohbet
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-3 pb-2 flex flex-col gap-1 min-h-0" style={{ maxHeight: "130px" }}>
+        {chatMessages.length === 0 && (
+          <div className="text-white/25 text-xs italic">Henüz mesaj yok...</div>
+        )}
+        {chatMessages.map((msg) => {
+          const isMe = msg.playerName === myName;
+          return (
+            <div key={msg.id} className={cn("text-xs flex gap-1.5", isMe ? "flex-row-reverse" : "flex-row")}>
+              <div className={cn(
+                "rounded-xl px-2.5 py-1 max-w-[85%] break-words leading-snug",
+                isMe
+                  ? "bg-amber-500/20 text-amber-200 rounded-tr-none"
+                  : "bg-white/10 text-white/80 rounded-tl-none"
+              )}>
+                {!isMe && (
+                  <span className="text-white/40 text-[9px] block mb-0.5">{msg.playerName}</span>
+                )}
+                {msg.text}
+                <span className="text-white/25 text-[8px] ml-1.5">{formatTime(msg.timestamp)}</span>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={bottomRef} />
+      </div>
+
+      <div className="flex gap-1.5 px-2.5 pb-2.5 pt-1.5 border-t border-white/5 shrink-0">
+        <input
+          ref={inputRef}
+          type="text"
+          value={inputText}
+          onChange={(e) => setInputText(e.target.value)}
+          onKeyDown={handleKeyDown}
+          maxLength={120}
+          placeholder="Mesaj yaz..."
+          className="flex-1 bg-white/5 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-white placeholder-white/25 outline-none focus:border-amber-400/50 focus:bg-white/10 transition-all"
+        />
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={handleSend}
+          disabled={!inputText.trim()}
+          className={cn(
+            "rounded-xl px-3 py-1.5 text-xs font-bold transition-all shrink-0",
+            inputText.trim()
+              ? "bg-amber-500 text-black hover:bg-amber-400"
+              : "bg-white/5 text-white/20 cursor-not-allowed"
+          )}
+        >
+          ↑
+        </motion.button>
+      </div>
+    </div>
+  );
+}
+
 function playGameSound(type: "your_turn" | "turn_end") {
   try {
     const ctx = new AudioContext();
@@ -828,6 +922,7 @@ export function OnlineGamePage() {
           </div>
 
           <MessagePanel />
+          <ChatPanel />
         </div>
 
         <div className="flex-1 flex flex-col gap-3">
