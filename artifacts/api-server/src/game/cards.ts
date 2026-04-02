@@ -95,7 +95,7 @@ const EVENT_COUNTS: Record<string, number> = {
   "Samandağ Biberi": 8, "Asi Nehri Taştı": 2, Misafirperverlik: 5,
   "Bereketli Topraklar": 5, "Esnaf Dayanışması": 4, "Sıcak Hava Dalgası": 3,
   "Saray Caddesine Taşındık": 2, "Memleket Hasreti": 2, Etobur: 2,
-  "Araktini Kafa Yaptı": 2, "Yaruhe Kalbek": 3, "Cınno Nıtto": 2,
+  "Araktini Kafa Yaptı": 2, "Yeruhe Kalbek": 3, "Cınno Nıtto": 2,
 };
 
 export function shuffle<T>(arr: T[]): T[] {

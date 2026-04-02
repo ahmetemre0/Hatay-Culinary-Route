@@ -120,7 +120,7 @@ const EVENT_COUNTS: Record<string, number> = {
   "Memleket Hasreti": 2,
   Etobur: 2,
   "Araktini Kafa Yaptı": 2,
-  "Yaruhe Kalbek": 3,
+  "Yeruhe Kalbek": 3,
   "Cınno Nıtto": 2,
 };
 
