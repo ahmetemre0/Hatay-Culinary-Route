@@ -875,7 +875,7 @@ export function OnlineGamePage() {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-3 flex-1">
-        <div className="lg:w-52 flex flex-col gap-3">
+        <div className="lg:w-72 flex flex-col gap-3">
           <div className="bg-black/30 backdrop-blur-sm rounded-2xl p-3 border border-white/10 space-y-2">
             <h3 className="text-white font-semibold text-xs text-center uppercase tracking-wider">
               🏆 Puan Tablosu
