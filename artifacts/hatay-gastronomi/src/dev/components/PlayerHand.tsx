@@ -91,11 +91,12 @@ export function PlayerHand() {
             return (
               <motion.div
                 key={card.id}
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, y: 80, rotateZ: -45, rotateY: 90 }}
+                animate={{ opacity: 1, y: 0, rotateZ: 0, rotateY: 0 }}
                 exit={{ opacity: 0, y: -30, scale: 0.8 }}
-                transition={{ delay: idx * 0.05 }}
+                transition={{ duration: 0.5, delay: idx * 0.05, ease: "easeOut" }}
                 className="relative"
+                style={{ perspective: 1000 }}
               >
                 <GameCard
                   card={card}
