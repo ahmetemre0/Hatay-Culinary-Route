@@ -408,6 +408,7 @@ export function handleUseEventCard(room: Room, socketId: string, cardId: string)
     // Put current market foods back at bottom of foodDeck and draw fresh ones
     state.foodDeck = [...state.foodDeck, ...state.marketFoods];
     state.marketFoods = [];
+    state.doubledMarketFoodIds = [];
     while (state.marketFoods.length < 3 && state.foodDeck.length > 0) {
       state.marketFoods.push(state.foodDeck.shift()!);
     }

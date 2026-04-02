@@ -361,7 +361,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       const newHand = cur.hand.filter((c) => c.id !== cardId);
       const players = state.players.map((p, i) => i === state.currentPlayerIndex ? { ...p, hand: newHand } : p);
       const r = addLog(state.logs, state.logIdCounter, `🍾 ${cur.name} "Araktini Kafa Yaptı" kullandı! Sipariş penceresi yenilendi.`, "event");
-      set({ players, marketFoods: newMarket, foodDeck: newFoodDeck, discardPile: discarded, logs: r.logs, logIdCounter: r.counter });
+      set({ players, marketFoods: newMarket, foodDeck: newFoodDeck, discardPile: discarded, doubledMarketFoodIds: [], logs: r.logs, logIdCounter: r.counter });
       return;
     }
 
