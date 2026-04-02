@@ -98,7 +98,7 @@ export function PlayerHand() {
             const cardAngle = (idx - centerIdx + 0.5) * (angleSpread / Math.max(totalCards - 1, 1));
             
             // Base X position for fan spread - each card is offset horizontally
-            const cardSpacing = 35; // pixels between each card's center
+            const cardSpacing = 65; // pixels between each card's center
             const baseX = (idx - centerIdx + 0.5) * cardSpacing;
             
             // Additional hover spread
