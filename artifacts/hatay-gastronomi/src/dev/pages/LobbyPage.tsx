@@ -42,6 +42,8 @@ export function LobbyPage({ onBack }: Props) {
     rejoinFromSession,
     permanentLeaveFromSession,
     pendingPermanentLeave,
+    turnTimerEnabled,
+    setTurnTimer,
   } = useOnlineStore();
 
   const { isAuthenticated, username, displayName, setDisplayName, logout } = useAuthStore();
@@ -488,6 +490,32 @@ export function LobbyPage({ onBack }: Props) {
                 {[...messages].reverse().map((m) => (
                   <div key={m.id} className="text-white/60 text-xs">{m.text}</div>
                 ))}
+              </div>
+            )}
+
+            {isHost && (
+              <div className="bg-black/20 border border-white/10 rounded-xl p-3 space-y-2">
+                <div className="text-white/40 text-xs uppercase tracking-wider flex items-center gap-1">
+                  ⚙ Oda Ayarları
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-white/80 text-xs font-medium">Tur Süresi</div>
+                    <div className="text-white/40 text-xs">Otomatik sıra geçişi (60 sn)</div>
+                  </div>
+                  <button
+                    onClick={() => setTurnTimer(!turnTimerEnabled)}
+                    className={cn(
+                      "relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0",
+                      turnTimerEnabled ? "bg-violet-500" : "bg-white/20"
+                    )}
+                  >
+                    <span className={cn(
+                      "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform",
+                      turnTimerEnabled ? "translate-x-6" : "translate-x-1"
+                    )} />
+                  </button>
+                </div>
               </div>
             )}
 

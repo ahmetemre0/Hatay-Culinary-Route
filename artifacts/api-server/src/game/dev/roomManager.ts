@@ -39,6 +39,8 @@ export type ServerGameState = {
   doubledMarketFoodIds: string[];
   victoryPoints: number;
   bannedUsernames: string[];
+  turnTimerEnabled: boolean;
+  turnTimerExpiresAt: number | null;
 };
 
 export type Room = {
@@ -72,6 +74,8 @@ function makeInitialState(): ServerGameState {
     doubledMarketFoodIds: [],
     victoryPoints: 31,
     bannedUsernames: [],
+    turnTimerEnabled: true,
+    turnTimerExpiresAt: null,
   };
 }
 
@@ -775,5 +779,42 @@ export function buildPlayerView(room: Room, playerIndex: number) {
     pendingEvent: isMyTurn && state.phase === "event_pending" ? state.pendingEvent : null,
     cookingAnimation: state.cookingAnimation,
     victoryPoints: state.victoryPoints,
+    turnTimerEnabled: state.turnTimerEnabled,
+    turnTimerExpiresAt: state.turnTimerExpiresAt,
   };
+}
+
+export function handleAutoEndTurn(room: Room): string | null {
+  const state = room.state;
+  if (state.phase !== "playing" && state.phase !== "event_pending") return "Yanlış aşama!";
+
+  if (state.phase === "event_pending") {
+    state.pendingEvent = null;
+    state.phase = "playing";
+  }
+
+  const numPlayers = state.players.length;
+  const cur = state.players[state.currentPlayerIndex];
+  cur.blockedFromRegion = false;
+
+  let nextIdx = (state.currentPlayerIndex + 1) % numPlayers;
+  let skipped = 0;
+  while (state.players[nextIdx].skippedNextTurn && skipped < numPlayers) {
+    addMessage(state, `${state.players[nextIdx].name} sırasını atlıyor!`, "warning");
+    state.players[nextIdx].skippedNextTurn = false;
+    nextIdx = (nextIdx + 1) % numPlayers;
+    skipped++;
+  }
+
+  state.currentPlayerIndex = nextIdx;
+  state.hasDrawnThisTurn = false;
+  state.canEndTurn = false;
+  addMessage(state, `⏱ Süre doldu! ${cur.name}'ın sırası geçti.`, "warning");
+  addMessage(state, `${state.players[nextIdx].name}'ın sırası`, "info");
+  return null;
+}
+
+export function setTurnTimerEnabled(room: Room, enabled: boolean): void {
+  room.state.turnTimerEnabled = enabled;
+  if (!enabled) room.state.turnTimerExpiresAt = null;
 }

@@ -52,6 +52,8 @@ export type PlayerView = {
   pendingEvent: EventCard | null;
   cookingAnimation: string | null;
   victoryPoints: number;
+  turnTimerEnabled: boolean;
+  turnTimerExpiresAt: number | null;
 };
 
 const SESSION_KEY = "hatay_dev_game_session";
@@ -125,6 +127,8 @@ type OnlineState = {
   pendingEvent: EventCard | null;
   cookingAnimation: string | null;
   victoryPoints: number;
+  turnTimerEnabled: boolean;
+  turnTimerExpiresAt: number | null;
   selectedCards: string[];
 
   chatMessages: ChatMessage[];
@@ -150,6 +154,7 @@ type OnlineState = {
   resolveEvent: (targetPlayerId?: number, cardIds?: string[]) => void;
   cancelEvent: () => void;
   endTurn: () => void;
+  setTurnTimer: (enabled: boolean) => void;
   clearError: () => void;
   resetOnline: () => void;
   checkRoomVersion: (code: string, cb: (version: "stable" | "dev" | null) => void) => void;
@@ -189,6 +194,8 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
   pendingEvent: null,
   cookingAnimation: null,
   victoryPoints: 31,
+  turnTimerEnabled: true,
+  turnTimerExpiresAt: null,
   selectedCards: [],
   chatMessages: [],
 
@@ -337,6 +344,8 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
         pendingEvent: view.pendingEvent,
         cookingAnimation: view.cookingAnimation,
         victoryPoints: view.victoryPoints,
+        turnTimerEnabled: view.turnTimerEnabled ?? false,
+        turnTimerExpiresAt: view.turnTimerExpiresAt ?? null,
         isHost,
         roomCode: view.roomCode,
         onlinePhase,
@@ -557,6 +566,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
   cancelEvent: () => { get().socket?.emit("cancel_event"); },
 
   endTurn: () => { get().socket?.emit("end_turn"); },
+  setTurnTimer: (enabled: boolean) => { get().socket?.emit("set_turn_timer", { enabled }); },
 
   sendChatMessage: (text) => {
     const trimmed = text.trim();
@@ -590,7 +600,8 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       marketFoods: [], drawDeckSize: 0, discardPileSize: 0, foodDeckSize: 0,
       doubledMarketFoodIds: [], messages: [], winnerIndex: null,
       hasDrawnThisTurn: false, canEndTurn: false, pendingEvent: null,
-      cookingAnimation: null, selectedCards: [], chatMessages: [],
+      cookingAnimation: null, turnTimerEnabled: true, turnTimerExpiresAt: null,
+      selectedCards: [], chatMessages: [],
     });
   },
 }));

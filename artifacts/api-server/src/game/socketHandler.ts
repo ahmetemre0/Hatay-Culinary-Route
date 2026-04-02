@@ -41,11 +41,43 @@ function saveAsync(room: Room) {
 
 function scheduleDeleteIfGameOver(room: Room) {
   if (room.state.phase === "game_over") {
+    clearRoomTurnTimer(room.code);
     setTimeout(() => {
       deleteRoomFromDb(room.code).catch(err => console.error("[DB] Delete error:", err));
       deleteChatMessages(room.code).catch(err => console.error("[DB] Chat delete error:", err));
     }, 60_000);
   }
+}
+
+const roomTurnTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function clearRoomTurnTimer(code: string) {
+  const t = roomTurnTimers.get(code);
+  if (t !== undefined) { clearTimeout(t); roomTurnTimers.delete(code); }
+}
+
+function resetTurnTimer(io: Server, room: Room, rm: RM) {
+  clearRoomTurnTimer(room.code);
+  const state = room.state as (typeof room.state & { turnTimerEnabled?: boolean; turnTimerExpiresAt?: number | null });
+  if (!state.turnTimerEnabled || (state.phase !== "playing" && state.phase !== "event_pending")) {
+    state.turnTimerExpiresAt = null;
+    return;
+  }
+  state.turnTimerExpiresAt = Date.now() + 60_000;
+  const timer = setTimeout(() => {
+    roomTurnTimers.delete(room.code);
+    const current = devRM.getRoom(room.code);
+    if (!current) return;
+    if (current.state.phase !== "playing" && current.state.phase !== "event_pending") return;
+    const err = devRM.handleAutoEndTurn(current);
+    if (!err) {
+      saveAsync(current as unknown as Room);
+      scheduleDeleteIfGameOver(current as unknown as Room);
+      resetTurnTimer(io, current as unknown as Room, rm);
+      emitAll(io, current as unknown as Room, rm);
+    }
+  }, 60_000);
+  roomTurnTimers.set(room.code, timer);
 }
 
 async function sendChatHistory(socket: Socket, roomCode: string) {
@@ -186,6 +218,7 @@ export function setupSocketHandler(io: Server) {
       if (room.hostSocketId !== socket.id) { socket.emit("error_msg", { message: "Sadece oda sahibi başlatabilir!" }); return; }
       const err = rm.startGame(room);
       if (err) { socket.emit("error_msg", { message: err }); return; }
+      resetTurnTimer(io, room, rm);
       saveAsync(room);
       emitAll(io, room, rm);
     });
@@ -257,6 +290,7 @@ export function setupSocketHandler(io: Server) {
       const { room, rm } = found;
       const err = rm.handleEndTurn(room, socket.id);
       if (err) { socket.emit("error_msg", { message: err }); return; }
+      resetTurnTimer(io, room, rm);
       saveAsync(room);
       emitAll(io, room, rm);
     });
@@ -350,10 +384,12 @@ export function setupSocketHandler(io: Server) {
       socket.leave(roomCode);
       socket.emit("you_left_permanently");
       if (result.room) {
+        resetTurnTimer(io, result.room as unknown as Room, devRM as unknown as RM);
         saveAsync(result.room as unknown as Room);
         scheduleDeleteIfGameOver(result.room as unknown as Room);
         emitAll(io, result.room as unknown as Room, devRM as unknown as RM);
       } else {
+        clearRoomTurnTimer(roomCode);
         deleteRoomFromDb(roomCode).catch(err => console.error("[DB] Delete error:", err));
         deleteChatMessages(roomCode).catch(err => console.error("[DB] Chat delete error:", err));
       }
@@ -367,6 +403,7 @@ export function setupSocketHandler(io: Server) {
         return;
       }
       const roomCode = found.room.code;
+      clearRoomTurnTimer(roomCode);
       const socketIds = devRM.destroyRoom(roomCode);
       socketIds.forEach(sid => {
         io.to(sid).emit("room_deleted", { message: "Oda sahibi odayı sildi." });
@@ -375,6 +412,20 @@ export function setupSocketHandler(io: Server) {
       });
       deleteRoomFromDb(roomCode).catch(err => console.error("[DB] Delete error:", err));
       deleteChatMessages(roomCode).catch(err => console.error("[DB] Chat delete error:", err));
+    });
+
+    socket.on("set_turn_timer", ({ enabled }: { enabled: boolean }) => {
+      const found = findBySocket(socket.id);
+      if (!found) return;
+      const { room, rm } = found;
+      if (room.hostSocketId !== socket.id) {
+        socket.emit("error_msg", { message: "Sadece oda sahibi bu ayarı değiştirebilir!" });
+        return;
+      }
+      devRM.setTurnTimerEnabled(room as unknown as devRM.Room, enabled);
+      resetTurnTimer(io, room, rm);
+      saveAsync(room);
+      emitAll(io, room, rm);
     });
 
     socket.on("kick_player", ({ targetIndex }: { targetIndex: number }) => {
