@@ -457,7 +457,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (targetPlayerId === undefined || !cardIds || cardIds.length < 2) return;
       const targetPlayer = state.players.find((p) => p.id === targetPlayerId)!;
       const myCards = cardIds.slice(0, 2);
-      const targetCards = targetPlayer.hand.slice(0, 2).map((c) => c.id);
+      const shuffledTarget = [...targetPlayer.hand].sort(() => Math.random() - 0.5);
+      const targetCards = shuffledTarget.slice(0, 2).map((c) => c.id);
       const players = state.players.map((p) => {
         if (p.id === cur.id) {
           const kept = p.hand.filter((c) => c.id !== card.id && !myCards.includes(c.id));

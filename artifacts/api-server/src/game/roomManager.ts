@@ -523,7 +523,8 @@ export function handleResolveEvent(room: Room, socketId: string, targetPlayerId?
     const target = state.players[targetPlayerId];
     if (!target || target.hand.length < 2) return "Hedef oyuncunun yeterli kartı yok!";
     const myCards = cardIds.slice(0, 2);
-    const targetCards = target.hand.slice(0, 2).map(c => c.id);
+    const shuffledTarget = [...target.hand].sort(() => Math.random() - 0.5);
+    const targetCards = shuffledTarget.slice(0, 2).map(c => c.id);
     const myKept = cur.hand.filter(c => c.id !== card.id && !myCards.includes(c.id));
     const myGained = target.hand.filter(c => targetCards.includes(c.id));
     const targetKept = target.hand.filter(c => !targetCards.includes(c.id));
