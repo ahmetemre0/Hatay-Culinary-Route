@@ -410,6 +410,8 @@ function OnlineMarketArea() {
 }
 
 function OnlinePlayerHand() {
+  const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
+
   const {
     myHand,
     selectedCards,
@@ -486,20 +488,56 @@ function OnlinePlayerHand() {
         </div>
       </div>
 
-      <div className="flex gap-2 flex-wrap justify-center min-h-[10rem]">
+      <div className="relative h-48 flex items-end justify-center">
         <AnimatePresence>
           {myHand.map((card, idx) => {
             const isSelected = selectedCards.includes(card.id);
             const isEvent = card.type === "event";
             const isCompletable = completableIds.has(card.id);
+            const isHovered = hoveredCardId === card.id;
+            const totalCards = myHand.length;
+            const angleSpread = Math.min(totalCards * 8, 60);
+            const centerIdx = totalCards / 2;
+            const cardAngle = (idx - centerIdx + 0.5) * (angleSpread / Math.max(totalCards - 1, 1));
+            
+            const cardSpacing = 65;
+            const baseX = (idx - centerIdx + 0.5) * cardSpacing;
+            
+            let hoverXOffset = 0;
+            if (hoveredCardId) {
+              const hoveredIdx = myHand.findIndex(c => c.id === hoveredCardId);
+              if (isHovered) {
+                hoverXOffset = 0;
+              } else {
+                hoverXOffset = idx < hoveredIdx ? -60 : 60;
+              }
+            }
+
             return (
               <motion.div
                 key={card.id}
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -30, scale: 0.8 }}
-                transition={{ delay: idx * 0.04 }}
-                className="relative"
+                initial={{ opacity: 0, y: 80, rotateZ: -45, rotateY: 90 }}
+                animate={{ 
+                  opacity: 1, 
+                  y: 0, 
+                  rotateZ: isHovered ? 0 : cardAngle,
+                  rotateY: 0,
+                  x: baseX + hoverXOffset,
+                  scale: isHovered ? 1.1 : 1,
+                  zIndex: isHovered ? 50 : idx
+                }}
+                exit={{ opacity: 0, y: -120, scale: 0.5, rotateZ: 20 }}
+                transition={{ 
+                  duration: 0.5, 
+                  delay: idx * 0.05, 
+                  ease: "easeOut",
+                  exit: { duration: 0.4, ease: "easeIn" },
+                  x: { duration: 0.3, ease: "easeOut" }
+                }}
+                className="absolute bottom-0 left-1/2 -translate-x-1/2"
+                style={{ perspective: 1000 }}
+                onMouseEnter={() => setHoveredCardId(card.id)}
+                onMouseLeave={() => setHoveredCardId(null)}
               >
                 <GameCard
                   card={card}
