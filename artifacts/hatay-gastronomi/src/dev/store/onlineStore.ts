@@ -302,7 +302,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     const { socket, playerName } = get();
     if (!socket || !playerName.trim()) return;
     const name = playerName.trim();
-    socket.emit("create_room", { playerName: name });
+    socket.emit("create_room", { playerName: name, version: "dev" });
     set({ playerName: name });
   },
 

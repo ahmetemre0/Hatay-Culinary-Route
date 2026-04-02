@@ -51,7 +51,7 @@ function generateCode(): string {
 
 function makeInitialState(): ServerGameState {
   return {
-    version: "stable",
+    version: "dev",
     phase: "lobby",
     players: [],
     currentPlayerIndex: 0,
