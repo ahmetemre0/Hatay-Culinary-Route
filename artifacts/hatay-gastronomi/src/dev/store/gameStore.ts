@@ -368,11 +368,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (card.action === "instant_points") {
       const newHand = cur.hand.filter((c) => c.id !== cardId);
       const players = state.players.map((p, i) =>
-        i === state.currentPlayerIndex ? { ...p, hand: newHand, points: p.points + 3 } : p
+        i === state.currentPlayerIndex ? { ...p, hand: newHand, points: p.points + 2 } : p
       );
-      const r = addLog(state.logs, state.logIdCounter, `💝 ${cur.name} "Yaruhe Kalbek" kullandı! +3 puan.`, "event");
+      const r = addLog(state.logs, state.logIdCounter, `💝 ${cur.name} "Yaruhe Kalbek" kullandı! +2 puan.`, "event");
       const newState: Partial<GameState> = { players, logs: r.logs, logIdCounter: r.counter, discardPile: [...state.discardPile, card] };
-      if (cur.points + 3 >= state.victoryPoints) {
+      if (cur.points + 2 >= state.victoryPoints) {
         newState.phase = "game_over";
         newState.winnerIndex = state.currentPlayerIndex;
       }
