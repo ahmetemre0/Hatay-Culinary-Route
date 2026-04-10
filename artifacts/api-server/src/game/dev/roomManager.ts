@@ -585,7 +585,7 @@ export function handleUseEventCard(room: Room, socketId: string, cardId: string)
   if (card.action === "instant_points") {
     cur.hand = cur.hand.filter(c => c.id !== cardId);
     state.discardPile.push(card);
-    const bonus = 3;
+    const bonus = 2;
     cur.points += bonus;
     addMessage(state, `🍊 ${cur.name} "${card.effectName}" kullandı! +${bonus} puan kazandı.`, "event");
     if (cur.points >= state.victoryPoints) {
