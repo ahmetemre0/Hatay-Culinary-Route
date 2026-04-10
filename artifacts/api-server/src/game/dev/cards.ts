@@ -79,16 +79,16 @@ const MATERIAL_TEMPLATES: { materialType: MaterialType; name: string; emoji: str
 
 const EVENT_TEMPLATES: Omit<EventCard, "id" | "type">[] = [
   { effectName: "Samandağ Biberi", description: "Bir rakibin bu tur atlamasına neden ol!", action: "skip_turn", emoji: "🌶️", color: "from-red-600 to-red-800" },
-  { effectName: "Asi Nehri Taştı", description: "Herkes elindeki tüm kartları desteye koyup yeniden çeker. Desteyi karıştırmayı unutmayın!", action: "reshuffle_all", emoji: "🌊", color: "from-blue-400 to-blue-700" },
-  { effectName: "Misafirperverlik", description: "Bir rakibinden rastgele 1 kart çek.", action: "steal_card", emoji: "🤝", color: "from-teal-400 to-teal-600" },
-  { effectName: "Bereketli Topraklar", description: "Desteden fazladan 2 kart çek.", action: "draw_two", emoji: "🌿", color: "from-green-500 to-green-700" },
-  { effectName: "Esnaf Dayanışması", description: "Bir oyuncunun rastgele 2 kartıyla kendi 2 kartını takas et.", action: "trade_two", emoji: "🏪", color: "from-yellow-500 to-yellow-700" },
-  { effectName: "Sıcak Hava Dalgası", description: "Vantilatörün olması iyi olmuş. Sen hariç tüm oyuncular bir sonraki tur sipariş tamamlayamaz.", action: "block_region", emoji: "☀️", color: "from-orange-400 to-yellow-500" },
-  { effectName: "Saray Caddesine Taşındık", description: "Yemeğin değer kazandı. Sipariş penceresindeki bir yemeğin puanını 2 ile çarp!", action: "multiply_points", emoji: "🏰", color: "from-amber-400 to-amber-600" },
-  { effectName: "Memleket Hasreti", description: "Tamamladığın siparişler arasından en düşük puanlı yemeğin puanını ikiye katla.", action: "multiply_lowest_points", emoji: "🏡", color: "from-sky-500 to-blue-700" },
+  { effectName: "Asi Nehri Taştı", description: "Dükkanları su bastı, çabuk paspas getir! Her şeye yeniden başlıyoruz. Herkes elindeki tüm kartları desteye koyup yeniden çeker.", action: "reshuffle_all", emoji: "🌊", color: "from-blue-400 to-blue-700" },
+  { effectName: "Misafirperverlik", description: "Rakibinin dükkanına selam vermeye gittin, dönüşte cebinde bir şey buldun. İstediğin rakibinden rastgele 1 kart çek.", action: "steal_card", emoji: "🤝", color: "from-teal-400 to-teal-600" },
+  { effectName: "Bereketli Topraklar", description: "Köydeki tarladan hasılat geldi. Desteden fazladan 2 kart çek.", action: "draw_two", emoji: "🌿", color: "from-green-500 to-green-700" },
+  { effectName: "Esnaf Dayanışması", description: "Ne koca yürekli bir komşun var, takası kabul etti. Başka bir oyuncunun rastgele 2 kartıyla elindeki istediğin 2 kartı takas et.", action: "trade_two", emoji: "🏪", color: "from-yellow-500 to-yellow-700" },
+  { effectName: "Sıcak Hava Dalgası", description: "Senin dükkanda klima olması iyi olmuş. Sen hariç hiçbir oyuncu bir sonraki tur sipariş tamamlayamaz.", action: "block_region", emoji: "☀️", color: "from-orange-400 to-yellow-500" },
+  { effectName: "Saray Caddesine Taşındık", description: "Yeni dükkanın hayırlı olsun. Yerdeki siparişlerden bir tanesi artık 2 kat daha değerli!", action: "multiply_points", emoji: "🏰", color: "from-amber-400 to-amber-600" },
+  { effectName: "Memleket Hasreti", description: "Gurbetten akraban geldi, yaptığın en kötü yemeğe bile bayıldı. Tamamladığın siparişler arasından en düşük puanlı yemeğin puanını ikiye katla.", action: "multiply_lowest_points", emoji: "🏡", color: "from-sky-500 to-blue-700" },
   { effectName: "Etobur", description: "Canın mangal çekti herhalde. Herkes elindeki Et kartlarını sana verir.", action: "collect_all_meat", emoji: "🥩", color: "from-red-500 to-red-700" },
-  { effectName: "Araktini Kafa Yaptı", description: "Şefin yemek yaparken içme diye kaç defa kızacak sana. Sipariş penceresi tamamen yenilenir.", action: "refresh_orders", emoji: "🍾", color: "from-indigo-500 to-violet-700" },
-  { effectName: "Yeruhe Kalbek", description: "Evde en sevdiğin yemek pişiyor. 3 puan kazan!", action: "instant_points", emoji: "💝", color: "from-pink-500 to-rose-700" },
+  { effectName: "İncir Suyu Kafa Yaptı", description: "Fazla kaçırdın. Siparişleri yanlış almışsın. Yerdeki siparişler tamamen yenilenir.", action: "refresh_orders", emoji: "🍾", color: "from-indigo-500 to-violet-700" },
+  { effectName: "Yeruhe Kalbek", description: "Bir teyze yaptığın yemekleri çok beğendi. 2 puan kazanırsın!", action: "instant_points", emoji: "💝", color: "from-pink-500 to-rose-700" },
   { effectName: "Cınno Nıtto", description: "Ortalık iyice karışır. Bir oyuncuyla elinizdeki tüm kartları takas edersiniz.", action: "swap_all_cards", emoji: "🔄", color: "from-teal-500 to-cyan-700" },
 ];
 
